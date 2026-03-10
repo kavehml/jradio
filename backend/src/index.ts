@@ -14,12 +14,14 @@ import './db/models/BacklogThreshold';
 import authRoutes from './routes/authRoutes';
 import backlogRoutes from './routes/backlogRoutes';
 import importExportRoutes from './routes/importExportRoutes';
+import { ensureAdminUser } from './services/authService';
 
 dotenv.config();
 
 async function bootstrap() {
   await initDb();
   await sequelize.sync();
+  await ensureAdminUser();
 
   const app = express();
   app.use(cors());

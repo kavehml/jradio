@@ -52,3 +52,25 @@ export function verifyToken(token: string) {
   }
   return payload as { sub: number; role: UserRole; name: string; iat: number; exp: number };
 }
+
+// Ensure there is at least one admin user based on env vars.
+export async function ensureAdminUser() {
+  const email = process.env.SEED_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD;
+
+  if (!email || !password) {
+    return;
+  }
+
+  const existing = await User.findOne({ where: { email } });
+  if (existing) {
+    return;
+  }
+
+  await createUser({
+    name: 'Admin User',
+    email,
+    password,
+    role: 'admin',
+  });
+}
