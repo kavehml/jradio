@@ -458,14 +458,13 @@ export const ClericalIntake: React.FC = () => {
         selectedSubCategories: subCategories,
         withContrast: false,
         notes:
-          (subCategories.length || (modality === 'MRI' && mriSequences.length)
-            ? [
-                subCategories.length ? `Exams: ${subCategories.join(', ')}` : '',
-                modality === 'MRI' && mriSequences.length ? `Sequences: ${mriSequences.join(', ')}` : '',
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            : undefined) || notes || undefined,
+          [
+            subCategories.length ? `Exams: ${subCategories.join(', ')}` : '',
+            modality === 'MRI' && mriSequences.length ? `Sequences: ${mriSequences.join(', ')}` : '',
+            notes.trim() ? `Notes: ${notes.trim()}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ') || undefined,
       });
       setMessage({ type: 'ok', text: `Requisition created. Visit #${(result as { visitNumber?: string }).visitNumber}.` });
       setPatientId('');
