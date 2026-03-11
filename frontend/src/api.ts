@@ -1,0 +1,88 @@
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || '';
+
+export function getApiBase(): string {
+  return API_BASE.replace(/\/$/, '');
+}
+
+export async function login(email: string, password: string) {
+  const res = await fetch(`${getApiBase()}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Login failed');
+  }
+  return res.json() as Promise<{ token: string; user: { id: number; name: string; email: string; role: string } }>;
+}
+
+export async function getMe(token: string) {
+  const res = await fetch(`${getApiBase()}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Not authenticated');
+  return res.json() as Promise<{ user: { id: number; role: string; name: string } }>;
+}
+
+export async function createUser(
+  token: string,
+  data: { name: string; email: string; password: string; role: string }
+) {
+  const res = await fetch(`${getApiBase()}/api/auth/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create user');
+  }
+  return res.json();
+}
+
+export async function getImagingCategories(token: string) {
+  const res = await fetch(`${getApiBase()}/api/imaging-categories`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load categories');
+  return res.json() as Promise<
+    { id: number; name: string; modality: string; bodyPart: string; imagePath: string | null }[]
+  >;
+}
+
+export async function createRequisition(
+  token: string,
+  data: {
+    patientIdOrTempLabel: string;
+    isNewExternalPatient: boolean;
+    orderingDoctorName: string;
+    orderingClinic: string;
+    site: string;
+    dateOfRequest?: string;
+    timeDelayPreset?: string;
+    hasImagingWithin24h?: boolean;
+    categoryId: number;
+    modality: string;
+    bodyParts: string[];
+    withContrast?: boolean;
+    notes?: string;
+  }
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create requisition');
+  }
+  return res.json();
+}

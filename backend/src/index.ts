@@ -14,7 +14,10 @@ import './db/models/BacklogThreshold';
 import authRoutes from './routes/authRoutes';
 import backlogRoutes from './routes/backlogRoutes';
 import importExportRoutes from './routes/importExportRoutes';
+import imagingCategoriesRoutes from './routes/imagingCategoriesRoutes';
+import requisitionsRoutes from './routes/requisitionsRoutes';
 import { ensureAdminUser } from './services/authService';
+import { seedImagingCategoriesIfEmpty } from './services/seedImagingCategories';
 
 dotenv.config();
 
@@ -22,6 +25,7 @@ async function bootstrap() {
   await initDb();
   await sequelize.sync();
   await ensureAdminUser();
+  await seedImagingCategoriesIfEmpty();
 
   const app = express();
   app.use(cors());
@@ -30,6 +34,8 @@ async function bootstrap() {
   app.use('/api/auth', authRoutes);
   app.use('/api/backlog', backlogRoutes);
   app.use('/api/io', importExportRoutes);
+  app.use('/api/imaging-categories', imagingCategoriesRoutes);
+  app.use('/api/requisitions', requisitionsRoutes);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
