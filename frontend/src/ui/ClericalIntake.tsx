@@ -213,24 +213,23 @@ export const ClericalIntake: React.FC = () => {
     return [];
   }
 
+  const CT_CATEGORY_ORDER = [
+    'MISCELLANEOUS CT',
+    'CT ABDO',
+    'CT CHEST',
+    'CT EXTREMITIES',
+    'CT HEAD',
+    'CT NECK',
+    'CT PELVIS',
+    'CT SPINE',
+  ] as const;
+
   const filteredCategories = modality
-    ? categories.filter((c) => {
-        if (c.modality.toLowerCase() !== modality.toLowerCase()) return false;
-        if (modality === 'CT') {
-          const canonical = [
-            'MISCELLANEOUS CT',
-            'CT ABDO',
-            'CT CHEST',
-            'CT EXTREMITIES',
-            'CT HEAD',
-            'CT NECK',
-            'CT PELVIS',
-            'CT SPINE',
-          ];
-          return canonical.includes(c.name.toUpperCase());
-        }
-        return true;
-      })
+    ? modality.toUpperCase() === 'CT'
+      ? CT_CATEGORY_ORDER.map((name) =>
+          categories.find((c) => c.modality.toUpperCase() === 'CT' && c.name === name)
+        ).filter((c): c is Category => c != null)
+      : categories.filter((c) => c.modality.toLowerCase() === modality.toLowerCase())
     : [];
 
   const handleSubmit = async (e: React.FormEvent) => {

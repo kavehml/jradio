@@ -1,16 +1,18 @@
 import { ImagingCategory } from '../db/models/ImagingCategory';
 
-const DEFAULT_CATEGORIES: { name: string; modality: 'CT' | 'MRI' | 'Angio' | 'US' | 'Other'; bodyPart: string; isSubspecialtyRestricted: boolean }[] = [
-  // CT – use the eight main protocol groups you described
-  { name: 'MISCELLANEOUS CT', modality: 'CT', bodyPart: 'misc', isSubspecialtyRestricted: false },
-  { name: 'CT ABDO', modality: 'CT', bodyPart: 'abdomen', isSubspecialtyRestricted: false },
-  { name: 'CT CHEST', modality: 'CT', bodyPart: 'chest', isSubspecialtyRestricted: false },
-  { name: 'CT EXTREMITIES', modality: 'CT', bodyPart: 'extremities', isSubspecialtyRestricted: false },
-  { name: 'CT HEAD', modality: 'CT', bodyPart: 'head', isSubspecialtyRestricted: false },
-  { name: 'CT NECK', modality: 'CT', bodyPart: 'neck', isSubspecialtyRestricted: false },
-  { name: 'CT PELVIS', modality: 'CT', bodyPart: 'pelvis', isSubspecialtyRestricted: false },
-  { name: 'CT SPINE', modality: 'CT', bodyPart: 'spine', isSubspecialtyRestricted: false },
-  // A couple of non‑CT examples to keep other modalities available
+// CT: only these 8 main categories (no others)
+const CT_CATEGORIES: { name: string; bodyPart: string }[] = [
+  { name: 'MISCELLANEOUS CT', bodyPart: 'misc' },
+  { name: 'CT ABDO', bodyPart: 'abdomen' },
+  { name: 'CT CHEST', bodyPart: 'chest' },
+  { name: 'CT EXTREMITIES', bodyPart: 'extremities' },
+  { name: 'CT HEAD', bodyPart: 'head' },
+  { name: 'CT NECK', bodyPart: 'neck' },
+  { name: 'CT PELVIS', bodyPart: 'pelvis' },
+  { name: 'CT SPINE', bodyPart: 'spine' },
+];
+
+const OTHER_MODALITY_CATEGORIES: { name: string; modality: 'MRI' | 'Angio' | 'US' | 'Other'; bodyPart: string; isSubspecialtyRestricted: boolean }[] = [
   { name: 'MRI BRAIN', modality: 'MRI', bodyPart: 'head', isSubspecialtyRestricted: false },
   { name: 'MRI SPINE', modality: 'MRI', bodyPart: 'spine', isSubspecialtyRestricted: false },
   { name: 'US ABDOMEN', modality: 'US', bodyPart: 'abdomen', isSubspecialtyRestricted: false },
@@ -18,8 +20,19 @@ const DEFAULT_CATEGORIES: { name: string; modality: 'CT' | 'MRI' | 'Angio' | 'US
 ];
 
 export async function seedImagingCategoriesIfEmpty() {
-  for (const cat of DEFAULT_CATEGORIES) {
-    // Ensure each named category exists; do not duplicate across restarts
+  for (const cat of CT_CATEGORIES) {
+    await ImagingCategory.findOrCreate({
+      where: { name: cat.name, modality: 'CT' },
+      defaults: {
+        name: cat.name,
+        modality: 'CT',
+        bodyPart: cat.bodyPart,
+        isSubspecialtyRestricted: false,
+        imagePath: null,
+      },
+    });
+  }
+  for (const cat of OTHER_MODALITY_CATEGORIES) {
     await ImagingCategory.findOrCreate({
       where: { name: cat.name, modality: cat.modality },
       defaults: {
