@@ -31,7 +31,7 @@ export const ClericalIntake: React.FC = () => {
   const [clinicOptions, setClinicOptions] = useState<{ id: number; name: string }[]>([]);
   const [siteOptions, setSiteOptions] = useState<{ id: number; name: string }[]>([]);
   const [modality, setModality] = useState<string>('');
-  const [subCategory, setSubCategory] = useState<string>('');
+  const [subCategories, setSubCategories] = useState<string[]>([]);
   const [mriTechnique, setMriTechnique] = useState<string>('');
 
   useEffect(() => {
@@ -117,54 +117,33 @@ export const ClericalIntake: React.FC = () => {
           ];
         case 'CT EXTREMITIES':
           return [
-            'CT Elbow C-',
-            'CT Elbow C+',
-            'CT Forearm C-',
-            'CT Forearm C+',
-            'CT Hand C-',
-            'CT Hand C+',
-            'CT Humerus C-',
-            'CT Humerus C+',
-            'CT Shoulder C-',
-            'CT Shoulder C+',
-            'CT Sternoclavicular joint C-',
-            'CT Sternoclavicular joint C+',
-            'CT Wrist C-',
-            'CT Wrist C+',
-            'CT Ankle C-',
-            'CT Ankle C+',
-            'CT Femur C-',
-            'CT Femur C+',
-            'CT Foot C-',
-            'CT Foot C+',
-            'CT Knee C-',
-            'CT Knee C+',
+            'CT Elbow',
+            'CT Forearm',
+            'CT Hand',
+            'CT Humerus',
+            'CT Shoulder',
+            'CT Sternoclavicular joint',
+            'CT Wrist',
+            'CT Ankle',
+            'CT Femur',
+            'CT Foot',
+            'CT Knee',
             'CT Prophecy',
-            'CT Sternum C-',
-            'CT Sternum C+',
-            'CT TibFib C-',
-            'CT TibFib C+',
+            'CT Sternum',
+            'CT TibFib',
             'CTA Lower Extremities',
             'CTA Upper Extremities',
           ];
         case 'CT HEAD':
           return [
             'CT Code Stroke C-/CTA H/N',
-            'CT Facial Bones C-',
-            'CT Facial Bones C+',
-            'CT Head C-',
-            'CT Head C-/C+',
-            'CT Head C+',
-            'CT Head Neuronavigation C-',
-            'CT Head Neuronavigation C+',
-            'CT Orbits C-',
-            'CT Orbits C+',
-            'CT Sella C-',
-            'CT Sella C+',
-            'CT Sinuses C-',
-            'CT Sinuses C+',
-            'CT Temporal Bones C-',
-            'CT Temporal Bones C+',
+            'CT Facial Bones',
+            'CT Head',
+            'CT Head Neuronavigation',
+            'CT Orbits',
+            'CT Sella',
+            'CT Sinuses',
+            'CT Temporal Bones',
             'CT Venogram of the Head',
             'CTA Head and Neck C-/CTA',
             'CTA Head C-/CTA',
@@ -176,36 +155,28 @@ export const ClericalIntake: React.FC = () => {
             'CT add Skin Marker',
             'CT add Tongue Depressor',
             'CT add Tongue Out',
-            'CT Neck C-',
-            'CT Neck C+',
-            'CT Neck C+ GSI',
-            'CT Neck C+ with Barium Paste',
-            'CT Neck Parotids C-/C+',
-            'CT Neck Parotids C-/C+ GSI',
+            'CT Neck',
+            'CT Neck GSI',
+            'CT Neck with Barium Paste',
+            'CT Neck Parotids',
+            'CT Neck Parotids GSI',
             'CT Parathyroid Perfusion',
             'CTA Carotids',
           ];
         case 'CT PELVIS':
           return [
-            'CT Hip C-',
-            'CT Hip C+',
-            'CT Pelvis C-',
-            'CT Pelvis C+',
-            'CT Sacrum/Coccyx C-',
-            'CT Sacrum/Coccyx C+',
+            'CT Hip',
+            'CT Pelvis',
+            'CT Sacrum/Coccyx',
           ];
         case 'CT SPINE':
           return [
-            'CT C Spine C-',
-            'CT C Spine C+',
-            'CT L Spine C-',
-            'CT L Spine C+',
-            'CT T Spine C-',
-            'CT T Spine C+',
+            'CT C Spine',
+            'CT L Spine',
+            'CT T Spine',
             'CT Myelogram',
             'CT Spine Neuronavigation',
-            'CT Total Spine C-',
-            'CT Total Spine C+',
+            'CT Total Spine',
           ];
         default:
           return [];
@@ -213,13 +184,13 @@ export const ClericalIntake: React.FC = () => {
     }
     if (cat.modality === 'MRI') {
       const n = name;
-      if (n.includes('BRAIN')) {
-        return ['MRI Brain w/o contrast', 'MRI Brain w & w/o contrast', 'MRI Brain w contrast'];
+      if (n.includes('HEAD') || n.includes('BRAIN')) {
+        return ['MRI Brain', 'MRI Pituitary', 'MRI IACs'];
       }
       if (n.includes('SPINE')) {
         return ['MRI Cervical Spine', 'MRI Thoracic Spine', 'MRI Lumbar Spine', 'MRI Whole Spine'];
       }
-      if (n.includes('ABDO') || n.includes('ABDomen') || n.includes('PELVIS')) {
+      if (n.includes('ABDO') || n.includes('PELVIS')) {
         return ['MRI Abdomen', 'MRI Pelvis', 'MRI Abdomen + Pelvis'];
       }
       if (n.includes('CHEST')) {
@@ -243,7 +214,23 @@ export const ClericalIntake: React.FC = () => {
   }
 
   const filteredCategories = modality
-    ? categories.filter((c) => c.modality.toLowerCase() === modality.toLowerCase())
+    ? categories.filter((c) => {
+        if (c.modality.toLowerCase() !== modality.toLowerCase()) return false;
+        if (modality === 'CT') {
+          const canonical = [
+            'MISCELLANEOUS CT',
+            'CT ABDO',
+            'CT CHEST',
+            'CT EXTREMITIES',
+            'CT HEAD',
+            'CT NECK',
+            'CT PELVIS',
+            'CT SPINE',
+          ];
+          return canonical.includes(c.name.toUpperCase());
+        }
+        return true;
+      })
     : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -269,8 +256,13 @@ export const ClericalIntake: React.FC = () => {
         bodyParts: [selectedCategory.bodyPart],
         withContrast,
         notes:
-          (subCategory || mriTechnique
-            ? [subCategory, modality === 'MRI' ? mriTechnique : ''].filter(Boolean).join(' · ')
+          (subCategories.length || mriTechnique
+            ? [
+                subCategories.length ? `Exams: ${subCategories.join(', ')}` : '',
+                modality === 'MRI' && mriTechnique ? `MRI technique: ${mriTechnique}` : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')
             : undefined) || notes || undefined,
       });
       setMessage({ type: 'ok', text: `Requisition created. Visit #${(result as { visitNumber?: string }).visitNumber}.` });
@@ -281,7 +273,7 @@ export const ClericalIntake: React.FC = () => {
       setDateOfRequest('');
       setTimeDelayPreset('');
       setModality('');
-      setSubCategory('');
+      setSubCategories([]);
       setMriTechnique('');
       setNotes('');
       setSelectedCategory(null);
@@ -312,7 +304,8 @@ export const ClericalIntake: React.FC = () => {
                 onClick={() => {
                   setModality(m);
                   setSelectedCategory(null);
-                  setSubCategory('');
+                  setSubCategories([]);
+                  setMriTechnique('');
                 }}
                 style={{
                   padding: '0.35rem 0.9rem',
@@ -344,7 +337,8 @@ export const ClericalIntake: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setSelectedCategory(cat);
-                      setSubCategory('');
+                      setSubCategories([]);
+                      setMriTechnique('');
                     }}
                     style={{
                       padding: '0.75rem 0.5rem',
@@ -369,14 +363,39 @@ export const ClericalIntake: React.FC = () => {
                 <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span>Exam type within this category</span>
-                    <select value={subCategory} onChange={(e) => setSubCategory(e.target.value)}>
-                      <option value="">Select exam type (optional)</option>
-                      {getSubCategoryOptions(selectedCategory).map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {getSubCategoryOptions(selectedCategory).map((opt) => {
+                        const checked = subCategories.includes(opt);
+                        return (
+                          <label
+                            key={opt}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 6px',
+                              borderRadius: 999,
+                              border: checked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                              background: checked ? '#eff6ff' : '#f8fafc',
+                              fontSize: '0.8rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setSubCategories((prev) =>
+                                  checked ? prev.filter((s) => s !== opt) : [...prev, opt]
+                                )
+                              }
+                              style={{ margin: 0 }}
+                            />
+                            <span>{opt}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </label>
                   {modality === 'CT' || modality === 'Angio' ? (
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
