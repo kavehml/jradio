@@ -82,10 +82,7 @@ export const RequisitionsAdmin: React.FC = () => {
       localImaging[r.id] || {
         modality: modalityForUi(item) || inferredModality,
         categoryId: item?.categoryId ?? null,
-        selectedSubCategories:
-          item?.selectedSubCategories?.length
-            ? item.selectedSubCategories
-            : parseSubCategoriesFromNotes(item?.specialNotes),
+        selectedSubCategories: parseSubCategoriesFromNotes(item?.specialNotes),
       }
     );
   };
@@ -141,10 +138,7 @@ export const RequisitionsAdmin: React.FC = () => {
       imagingMap[r.id] = {
         modality: modalityForUi(item),
         categoryId: item?.categoryId ?? null,
-        selectedSubCategories:
-          item?.selectedSubCategories?.length
-            ? item.selectedSubCategories
-            : parseSubCategoriesFromNotes(item?.specialNotes),
+        selectedSubCategories: parseSubCategoriesFromNotes(item?.specialNotes),
       };
       notesMap[r.id] = item?.specialNotes || '';
     });
@@ -184,8 +178,8 @@ export const RequisitionsAdmin: React.FC = () => {
                           rvuValue: value,
                           modality: '',
                           categoryId: null,
-                          selectedSubCategories: [],
                           category: null,
+                          specialNotes: null,
                         },
                       ],
               }
@@ -224,6 +218,7 @@ export const RequisitionsAdmin: React.FC = () => {
         modality: current.modality,
         categoryId: current.categoryId,
         selectedSubCategories: current.selectedSubCategories,
+        notes: localNotes[id] || '',
       });
       refresh();
     } catch (e) {
@@ -407,11 +402,7 @@ export const RequisitionsAdmin: React.FC = () => {
                         ))}
                       </select>
                     ) : (
-                      (
-                        (r.imagingItems?.[0]?.selectedSubCategories?.length
-                          ? r.imagingItems?.[0]?.selectedSubCategories
-                          : parseSubCategoriesFromNotes(r.imagingItems?.[0]?.specialNotes)) || []
-                      ).join(', ') || '—'
+                      parseSubCategoriesFromNotes(r.imagingItems?.[0]?.specialNotes).join(', ') || '—'
                     )}
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>

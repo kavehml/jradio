@@ -8,7 +8,6 @@ interface RequisitionImagingItemAttributes {
   requisitionId: number;
   modality: string;
   bodyParts: string[];
-  selectedSubCategories: string[];
   withContrast: boolean;
   specialNotes: string | null;
   rvuValue: number;
@@ -26,7 +25,6 @@ export class RequisitionImagingItem
   public requisitionId!: number;
   public modality!: string;
   public bodyParts!: string[];
-  public selectedSubCategories!: string[];
   public withContrast!: boolean;
   public specialNotes!: string | null;
   public rvuValue!: number;
@@ -54,11 +52,6 @@ RequisitionImagingItem.init(
       allowNull: false,
     },
     bodyParts: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: false,
-      defaultValue: [],
-    },
-    selectedSubCategories: {
       type: DataTypes.ARRAY(DataTypes.STRING),
       allowNull: false,
       defaultValue: [],

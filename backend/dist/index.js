@@ -11,8 +11,11 @@ require("./db/models/User");
 require("./db/models/RadiologistProfile");
 require("./db/models/ShiftAssignment");
 require("./db/models/ImagingCategory");
+require("./db/models/ImagingSubCategory");
 require("./db/models/Requisition");
 require("./db/models/RequisitionImagingItem");
+require("./db/models/RequisitionSpecialtyRequirement");
+require("./db/models/SpecialtyRule");
 require("./db/models/Visit");
 require("./db/models/Clinic");
 require("./db/models/SiteLocation");
@@ -24,6 +27,8 @@ const importExportRoutes_1 = __importDefault(require("./routes/importExportRoute
 const imagingCategoriesRoutes_1 = __importDefault(require("./routes/imagingCategoriesRoutes"));
 const requisitionsRoutes_1 = __importDefault(require("./routes/requisitionsRoutes"));
 const metaRoutes_1 = __importDefault(require("./routes/metaRoutes"));
+const shiftsRoutes_1 = __importDefault(require("./routes/shiftsRoutes"));
+const specialtyRulesRoutes_1 = __importDefault(require("./routes/specialtyRulesRoutes"));
 const authService_1 = require("./services/authService");
 const seedImagingCategories_1 = require("./services/seedImagingCategories");
 dotenv_1.default.config();
@@ -41,6 +46,8 @@ async function bootstrap() {
     app.use('/api/imaging-categories', imagingCategoriesRoutes_1.default);
     app.use('/api/requisitions', requisitionsRoutes_1.default);
     app.use('/api/meta', metaRoutes_1.default);
+    app.use('/api/shifts', shiftsRoutes_1.default);
+    app.use('/api/specialty-rules', specialtyRulesRoutes_1.default);
     app.get('/health', (_req, res) => {
         res.json({ status: 'ok' });
     });

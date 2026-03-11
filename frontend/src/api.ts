@@ -277,7 +277,6 @@ export interface RequisitionSummary {
     rvuValue: number;
     modality: string;
     categoryId: number | null;
-    selectedSubCategories: string[];
     specialNotes?: string | null;
     category?: { id: number; name: string } | null;
   }[];
@@ -328,7 +327,7 @@ export async function updateRequisitionSchedule(
 export async function updateRequisitionImaging(
   token: string,
   id: number,
-  data: { modality: string; categoryId: number; selectedSubCategories: string[] }
+  data: { modality: string; categoryId: number; selectedSubCategories: string[]; notes?: string }
 ) {
   const res = await fetch(`${getApiBase()}/api/requisitions/${id}/imaging`, {
     method: 'PATCH',

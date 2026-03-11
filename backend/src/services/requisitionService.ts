@@ -5,6 +5,7 @@ import { SpecialtyRule } from '../db/models/SpecialtyRule';
 import { RequisitionSpecialtyRequirement } from '../db/models/RequisitionSpecialtyRequirement';
 import { ImagingCategory } from '../db/models/ImagingCategory';
 import { Op } from 'sequelize';
+import { sequelize } from '../db/index';
 
 // Due date: if timeDelayPreset set, use it; else no imaging in 24h -> 3 months, has imaging in 24h -> 30 days.
 const DEFAULT_CONTROL_DAYS = 90;
@@ -74,70 +75,83 @@ export async function createRequisition(params: {
   notes?: string;
   selectedSubCategories?: string[];
 }) {
-  const now = new Date();
-  let calculatedDueDate: Date | null = null;
-  const hours = parseTimeDelayPreset(params.timeDelayPreset);
-  if (hours != null) {
-    calculatedDueDate = new Date(now.getTime() + hours * 60 * 60 * 1000);
-  } else {
-    const days = params.hasImagingWithin24h ? DEFAULT_PRIMARY_DAYS : DEFAULT_CONTROL_DAYS;
-    calculatedDueDate = new Date(now);
-    calculatedDueDate.setDate(calculatedDueDate.getDate() + days);
-  }
+  return sequelize.transaction(async (tx) => {
+    const now = new Date();
+    let calculatedDueDate: Date | null = null;
+    const hours = parseTimeDelayPreset(params.timeDelayPreset);
+    if (hours != null) {
+      calculatedDueDate = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    } else {
+      const days = params.hasImagingWithin24h ? DEFAULT_PRIMARY_DAYS : DEFAULT_CONTROL_DAYS;
+      calculatedDueDate = new Date(now);
+      calculatedDueDate.setDate(calculatedDueDate.getDate() + days);
+    }
 
-  const requestedDate = params.dateOfRequest ? new Date(params.dateOfRequest) : null;
-  const urgencyWindowHours = hours;
+    const requestedDate = params.dateOfRequest ? new Date(params.dateOfRequest) : null;
+    const urgencyWindowHours = hours;
 
-  const requisition = await Requisition.create({
-    requestedDate,
-    urgencyWindowHours,
-    calculatedDueDate,
-    patientIdOrTempLabel: params.patientIdOrTempLabel,
-    isNewExternalPatient: params.isNewExternalPatient,
-    orderingDoctorName: params.orderingDoctorName,
-    orderingClinic: params.orderingClinic,
-    site: params.site,
-    status: 'pending_approval',
+    const requisition = await Requisition.create(
+      {
+        requestedDate,
+        urgencyWindowHours,
+        calculatedDueDate,
+        patientIdOrTempLabel: params.patientIdOrTempLabel,
+        isNewExternalPatient: params.isNewExternalPatient,
+        orderingDoctorName: params.orderingDoctorName,
+        orderingClinic: params.orderingClinic,
+        site: params.site,
+        status: 'pending_approval',
+      },
+      { transaction: tx }
+    );
+
+    const rvuValue = computeRvu(params.bodyParts, params.modality);
+    await RequisitionImagingItem.create(
+      {
+        requisitionId: requisition.id,
+        modality: params.modality,
+        bodyParts: params.bodyParts,
+        withContrast: params.withContrast ?? false,
+        specialNotes: params.notes ?? null,
+        rvuValue,
+        categoryId: params.categoryId,
+      },
+      { transaction: tx }
+    );
+
+    const visitNumber = `V-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${requisition.id}`;
+    await Visit.create(
+      {
+        requisitionId: requisition.id,
+        visitNumber,
+        scheduledDateTime: null,
+        location: params.site,
+      },
+      { transaction: tx }
+    );
+
+    const requiredSubspecialties = await resolveRequiredSubspecialties({
+      modality: params.modality,
+      categoryId: params.categoryId,
+      ...(params.selectedSubCategories !== undefined && {
+        selectedSubCategories: params.selectedSubCategories,
+      }),
+    });
+
+    await RequisitionSpecialtyRequirement.create(
+      {
+        requisitionId: requisition.id,
+        requiredSubspecialties,
+      },
+      { transaction: tx }
+    );
+
+    return {
+      id: requisition.id,
+      visitNumber,
+      calculatedDueDate: calculatedDueDate.toISOString(),
+      status: requisition.status,
+      requiredSubspecialties,
+    };
   });
-
-  const rvuValue = computeRvu(params.bodyParts, params.modality);
-  await RequisitionImagingItem.create({
-    requisitionId: requisition.id,
-    modality: params.modality,
-    bodyParts: params.bodyParts,
-    selectedSubCategories: params.selectedSubCategories || [],
-    withContrast: params.withContrast ?? false,
-    specialNotes: params.notes ?? null,
-    rvuValue,
-    categoryId: params.categoryId,
-  });
-
-  const visitNumber = `V-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${requisition.id}`;
-  await Visit.create({
-    requisitionId: requisition.id,
-    visitNumber,
-    scheduledDateTime: null,
-    location: params.site,
-  });
-
-  const requiredSubspecialties = await resolveRequiredSubspecialties({
-    modality: params.modality,
-    categoryId: params.categoryId,
-    ...(params.selectedSubCategories !== undefined && {
-      selectedSubCategories: params.selectedSubCategories,
-    }),
-  });
-
-  await RequisitionSpecialtyRequirement.create({
-    requisitionId: requisition.id,
-    requiredSubspecialties,
-  });
-
-  return {
-    id: requisition.id,
-    visitNumber,
-    calculatedDueDate: calculatedDueDate.toISOString(),
-    status: requisition.status,
-    requiredSubspecialties,
-  };
 }

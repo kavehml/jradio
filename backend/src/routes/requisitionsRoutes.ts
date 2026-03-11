@@ -9,6 +9,21 @@ import { ImagingCategory } from '../db/models/ImagingCategory';
 
 const router = Router();
 
+function computeRvuForImaging(bodyParts: string[], modality: string): number {
+  if (modality.toLowerCase() === 'angio') return 3;
+  if (bodyParts.length <= 1) return 1;
+  return 2;
+}
+
+function mergeExamNotes(selectedSubCategories: string[], notes?: string | null): string | null {
+  const stripped = (notes || '')
+    .replace(/Exams:\s*([^·]+)(\s*·\s*)?/gi, '')
+    .replace(/\s*·\s*$/g, '')
+    .trim();
+  if (!selectedSubCategories.length) return stripped || null;
+  return `Exams: ${selectedSubCategories.join(', ')}${stripped ? ` · ${stripped}` : ''}`;
+}
+
 function validateAndBuildParams(body: {
   patientIdOrTempLabel?: string;
   isNewExternalPatient?: boolean;
@@ -142,7 +157,7 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
         {
           model: RequisitionImagingItem,
           as: 'imagingItems',
-          attributes: ['rvuValue', 'modality', 'categoryId', 'selectedSubCategories', 'specialNotes'],
+          attributes: ['rvuValue', 'modality', 'categoryId', 'specialNotes'],
           include: [{ model: ImagingCategory, as: 'category', attributes: ['id', 'name'] }],
         },
         {
@@ -215,6 +230,7 @@ router.patch('/:id/imaging', requireAuth, requireRole(['admin', 'radiologist']),
     modality?: string;
     categoryId?: number;
     selectedSubCategories?: string[];
+    notes?: string;
   };
   if (!Number.isFinite(id) || !body.modality || body.categoryId == null) {
     return res.status(400).json({ error: 'modality and categoryId are required' });
@@ -222,8 +238,7 @@ router.patch('/:id/imaging', requireAuth, requireRole(['admin', 'radiologist']),
   try {
     const reqn = await Requisition.findByPk(id);
     if (!reqn) return res.status(404).json({ error: 'Requisition not found' });
-    const item = await RequisitionImagingItem.findOne({ where: { requisitionId: id } });
-    if (!item) return res.status(404).json({ error: 'Imaging item not found for requisition' });
+    let item = await RequisitionImagingItem.findOne({ where: { requisitionId: id } });
 
     const category = await ImagingCategory.findByPk(body.categoryId);
     if (!category) return res.status(404).json({ error: 'Category not found' });
@@ -232,14 +247,23 @@ router.patch('/:id/imaging', requireAuth, requireRole(['admin', 'radiologist']),
       ? body.selectedSubCategories.filter(Boolean)
       : [];
 
-    item.modality = body.modality;
-    item.categoryId = body.categoryId;
-    item.bodyParts = [category.bodyPart];
-    item.selectedSubCategories = selectedSubCategories;
-    item.specialNotes = selectedSubCategories.length
-      ? `Exams: ${selectedSubCategories.join(', ')}`
-      : item.specialNotes;
-    await item.save();
+    if (!item) {
+      item = await RequisitionImagingItem.create({
+        requisitionId: id,
+        modality: body.modality,
+        categoryId: body.categoryId,
+        bodyParts: [category.bodyPart],
+        withContrast: false,
+        specialNotes: mergeExamNotes(selectedSubCategories, body.notes),
+        rvuValue: computeRvuForImaging([category.bodyPart], body.modality),
+      });
+    } else {
+      item.modality = body.modality;
+      item.categoryId = body.categoryId;
+      item.bodyParts = [category.bodyPart];
+      item.specialNotes = mergeExamNotes(selectedSubCategories, body.notes ?? item.specialNotes);
+      await item.save();
+    }
 
     let requirement = await RequisitionSpecialtyRequirement.findOne({
       where: { requisitionId: id },
@@ -263,7 +287,7 @@ router.patch('/:id/imaging', requireAuth, requireRole(['admin', 'radiologist']),
       requisitionId: id,
       modality: item.modality,
       categoryId: item.categoryId,
-      selectedSubCategories: item.selectedSubCategories,
+      selectedSubCategories,
       requiredSubspecialties: requirement.requiredSubspecialties,
     });
   } catch (err) {
@@ -313,10 +337,29 @@ router.patch('/:id/notes', requireAuth, requireRole(['admin', 'radiologist', 'cl
   const { notes } = req.body as { notes?: string };
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid requisition id' });
   try {
-    const item = await RequisitionImagingItem.findOne({ where: { requisitionId: id } });
-    if (!item) return res.status(404).json({ error: 'Imaging item not found for requisition' });
-    item.specialNotes = notes?.trim() ? notes.trim() : null;
-    await item.save();
+    const reqn = await Requisition.findByPk(id);
+    if (!reqn) return res.status(404).json({ error: 'Requisition not found' });
+
+    let item = await RequisitionImagingItem.findOne({ where: { requisitionId: id } });
+    if (!item) {
+      item = await RequisitionImagingItem.create({
+        requisitionId: id,
+        modality: 'Unknown',
+        bodyParts: [],
+        withContrast: false,
+        specialNotes: notes?.trim() ? notes.trim() : null,
+        rvuValue: 1,
+        categoryId: null,
+      });
+    } else {
+      const examMatch = (item.specialNotes || '').match(/Exams:\s*([^·]+)/i);
+      const exams = examMatch?.[1]
+        ?.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) || [];
+      item.specialNotes = mergeExamNotes(exams, notes?.trim() || null);
+      await item.save();
+    }
     return res.json({ requisitionId: id, notes: item.specialNotes });
   } catch (err) {
     console.error(err);
