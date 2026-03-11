@@ -44,6 +44,55 @@ export async function createUser(
   return res.json();
 }
 
+export interface RadiologistProfileDto {
+  subspecialties: string[];
+  maxRvuPerShift: number | null;
+  sites: string[];
+}
+
+export interface UserDto {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  radiologistProfile: RadiologistProfileDto | null;
+}
+
+export async function getUsers(token: string) {
+  const res = await fetch(`${getApiBase()}/api/auth/users`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to load users');
+  }
+  const json = (await res.json()) as { users: UserDto[] };
+  return json.users;
+}
+
+export async function updateRadiologistProfile(
+  token: string,
+  userId: number,
+  data: { subspecialties: string[]; maxRvuPerShift?: number | null; sites?: string[] }
+) {
+  const res = await fetch(`${getApiBase()}/api/auth/users/${userId}/radiologist-profile`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update radiologist profile');
+  }
+  return res.json() as Promise<RadiologistProfileDto & { id: number; userId: number }>;
+}
+
 export async function getImagingCategories(token: string) {
   const res = await fetch(`${getApiBase()}/api/imaging-categories`, {
     headers: { Authorization: `Bearer ${token}` },

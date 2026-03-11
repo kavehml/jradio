@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { createUser } from '../api';
+import { createUser, getUsers, updateRadiologistProfile, UserDto } from '../api';
 
 export const AdminDashboard: React.FC = () => {
   const { token } = useAuth();
@@ -9,6 +9,35 @@ export const AdminDashboard: React.FC = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'radiologist' | 'clerical'>('radiologist');
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [users, setUsers] = useState<UserDto[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  const subspecialtyOptions = [
+    { id: 'neck', label: 'Neck' },
+    { id: 'angio', label: 'Angio' },
+    { id: 'interventional', label: 'Interventional' },
+    { id: 'virtual_colonoscopy', label: 'Virtual colonoscopy' },
+    { id: 'coronary', label: 'Coronary' },
+    { id: 'general_body', label: 'General body' },
+  ] as const;
+
+  const loadUsers = async () => {
+    if (!token) return;
+    setLoadingUsers(true);
+    try {
+      const list = await getUsers(token);
+      setUsers(list);
+    } catch (err) {
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to load users' });
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,8 +49,36 @@ export const AdminDashboard: React.FC = () => {
       setName('');
       setEmail('');
       setPassword('');
+      await loadUsers();
     } catch (err) {
       setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to create user' });
+    }
+  };
+
+  const handleToggleSubspecialty = async (user: UserDto, subspecialtyId: string) => {
+    if (!token) return;
+    if (user.role !== 'radiologist') return;
+    const current = user.radiologistProfile?.subspecialties ?? [];
+    const exists = current.includes(subspecialtyId);
+    const next = exists ? current.filter((s) => s !== subspecialtyId) : [...current, subspecialtyId];
+    try {
+      const updated = await updateRadiologistProfile(token, user.id, {
+        subspecialties: next,
+        maxRvuPerShift: user.radiologistProfile?.maxRvuPerShift ?? null,
+        sites: user.radiologistProfile?.sites ?? [],
+      });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? { ...u, radiologistProfile: { subspecialties: updated.subspecialties, maxRvuPerShift: updated.maxRvuPerShift, sites: updated.sites } }
+            : u
+        )
+      );
+    } catch (err) {
+      setMessage({
+        type: 'err',
+        text: err instanceof Error ? err.message : 'Failed to update subspecialties',
+      });
     }
   };
 
@@ -75,15 +132,69 @@ export const AdminDashboard: React.FC = () => {
         </form>
       </div>
 
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-        <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
-          <h3>Shifts</h3>
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Configure AM/PM/Night shifts and assign radiologists (coming next).</p>
-        </div>
-        <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
-          <h3>Requisition backlog</h3>
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>View backlog and redistribute (use API or future UI).</p>
-        </div>
+      <div style={{ background: 'white', padding: '1.5rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
+        <h3 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Users</h3>
+        {loadingUsers ? (
+          <p>Loading users…</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Email</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Role</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Active</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Subspecialties (radiologists)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id}>
+                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{u.name}</td>
+                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{u.email}</td>
+                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9', textTransform: 'capitalize' }}>{u.role}</td>
+                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{u.active ? 'Yes' : 'No'}</td>
+                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                      {u.role !== 'radiologist' ? (
+                        <span style={{ color: '#94a3b8' }}>N/A</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {subspecialtyOptions.map((opt) => {
+                            const checked = u.radiologistProfile?.subspecialties?.includes(opt.id) ?? false;
+                            return (
+                              <label
+                                key={opt.id}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '2px 6px',
+                                  borderRadius: 999,
+                                  border: checked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                                  background: checked ? '#eff6ff' : '#f8fafc',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => handleToggleSubspecialty(u, opt.id)}
+                                  style={{ margin: 0 }}
+                                />
+                                <span>{opt.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );
