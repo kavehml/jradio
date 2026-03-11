@@ -27,10 +27,11 @@ export const ClericalIntake: React.FC = () => {
   const [timeDelayPreset, setTimeDelayPreset] = useState('');
   const [hasImagingWithin24h, setHasImagingWithin24h] = useState(false);
   const [withContrast, setWithContrast] = useState(false);
-  const [protocolText, setProtocolText] = useState('');
   const [notes, setNotes] = useState('');
   const [clinicOptions, setClinicOptions] = useState<{ id: number; name: string }[]>([]);
   const [siteOptions, setSiteOptions] = useState<{ id: number; name: string }[]>([]);
+  const [modality, setModality] = useState<string>('');
+  const [subCategory, setSubCategory] = useState<string>('');
 
   useEffect(() => {
     if (!token) return;
@@ -44,10 +45,65 @@ export const ClericalIntake: React.FC = () => {
       .finally(() => setLoading(false));
   }, [token]);
 
+  const filteredCategories = modality
+    ? categories.filter((c) => c.modality.toLowerCase() === modality.toLowerCase())
+    : categories;
+
+  function getSubCategoryOptions(cat: Category | null): string[] {
+    if (!cat) return [];
+    const name = cat.name.toLowerCase();
+    if (name.includes('extremit')) {
+      return [
+        'CT Elbow C-',
+        'CT Elbow C+',
+        'CT Forearm C-',
+        'CT Forearm C+',
+        'CT Hand C-',
+        'CT Hand C+',
+        'CT Humerus C-',
+        'CT Humerus C+',
+        'CT Shoulder C-',
+        'CT Shoulder C+',
+        'CT Sternoclavicular joint C-',
+        'CT Sternoclavicular joint C+',
+        'CT Wrist C-',
+        'CT Wrist C+',
+        'CT Ankle C-',
+        'CT Ankle C+',
+        'CT Femur C-',
+        'CT Femur C+',
+        'CT Foot C-',
+        'CT Foot C+',
+        'CT Knee C-',
+        'CT Knee C+',
+        'CT TibFib C-',
+        'CT TibFib C+',
+        'CTA Lower Extremities',
+        'CTA Upper Extremities',
+      ];
+    }
+    if (name.includes('head')) {
+      return ['CT Head C-', 'CT Head C+', 'CT Code Stroke C-/CTA H/N', 'CTA Head and Neck'];
+    }
+    if (name.includes('neck')) {
+      return ['CT Neck C-', 'CT Neck C+', 'CT Neck C+ with Barium Paste', 'CTA Carotids'];
+    }
+    if (name.includes('chest')) {
+      return ['CT Chest C-', 'CT Chest C+', 'CTA Chest', 'CTA C/A/P (bleed)'];
+    }
+    if (name.includes('abdo') || name.includes('abdomen') || name.includes('pelvis')) {
+      return ['CT Abdo C-', 'CT Abdo C+', 'CT Pelvis C-', 'CT Pelvis C+', 'CT Virtual Colonoscopy', 'CTA Abdo/Pelvis'];
+    }
+    if (name.includes('spine')) {
+      return ['CT C Spine', 'CT T Spine', 'CT L Spine', 'CT Total Spine', 'CT Myelogram'];
+    }
+    return [];
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedCategory) {
-      setMessage({ type: 'err', text: 'Please select an imaging category.' });
+    if (!token || !selectedCategory || !modality) {
+      setMessage({ type: 'err', text: 'Please select modality and imaging category.' });
       return;
     }
     setMessage(null);
@@ -63,10 +119,10 @@ export const ClericalIntake: React.FC = () => {
         timeDelayPreset: timeDelayPreset || undefined,
         hasImagingWithin24h,
         categoryId: selectedCategory.id,
-        modality: selectedCategory.modality,
+        modality,
         bodyParts: [selectedCategory.bodyPart],
         withContrast,
-        notes: protocolText ? `${protocolText}${notes ? ' — ' + notes : ''}` : notes || undefined,
+        notes: subCategory ? `${subCategory}${notes ? ' — ' + notes : ''}` : notes || undefined,
       });
       setMessage({ type: 'ok', text: `Requisition created. Visit #${(result as { visitNumber?: string }).visitNumber}.` });
       setPatientId('');
@@ -75,7 +131,8 @@ export const ClericalIntake: React.FC = () => {
       setSite('');
       setDateOfRequest('');
       setTimeDelayPreset('');
-      setProtocolText('');
+      setModality('');
+      setSubCategory('');
       setNotes('');
       setSelectedCategory(null);
     } catch (err) {
@@ -89,16 +146,40 @@ export const ClericalIntake: React.FC = () => {
     <section style={{ maxWidth: 960, margin: '0 auto' }}>
       <h2>Clerical requisition intake</h2>
       <p style={{ color: '#4b5563', marginBottom: '1rem' }}>
-        Select an imaging category, then fill the form. Due date is set automatically from time delay or prior imaging.
+        Choose modality, then category and exam type. Due date is set automatically from time delay or prior imaging.
       </p>
 
       {loading ? (
         <p>Loading categories…</p>
       ) : (
         <>
+          <h3 style={{ marginBottom: '0.5rem' }}>Modality</h3>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            {['X-ray', 'CT', 'MRI', 'US', 'PET'].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  setModality(m);
+                  setSelectedCategory(null);
+                  setSubCategory('');
+                }}
+                style={{
+                  padding: '0.35rem 0.9rem',
+                  borderRadius: 999,
+                  border: modality === m ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                  background: modality === m ? '#eff6ff' : 'white',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                }}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
           <h3 style={{ marginBottom: '0.5rem' }}>Imaging category</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            {categories.map((cat) => (
+            {filteredCategories.map((cat) => (
               <button
                 key={cat.id}
                 type="button"
@@ -246,15 +327,19 @@ export const ClericalIntake: React.FC = () => {
           <input type="checkbox" checked={withContrast} onChange={(e) => setWithContrast(e.target.checked)} />
           <span>With contrast</span>
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Protocol text from booking screen (optional)</span>
-          <textarea
-            value={protocolText}
-            onChange={(e) => setProtocolText(e.target.value)}
-            rows={3}
-            placeholder="e.g. CT EXTREMITIES – CT Knee C+ [15m] 8276K..."
-          />
-        </label>
+        {selectedCategory && (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span>Exam type within this category</span>
+            <select value={subCategory} onChange={(e) => setSubCategory(e.target.value)}>
+              <option value="">Select exam type (optional)</option>
+              {getSubCategoryOptions(selectedCategory).map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Additional notes</span>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
