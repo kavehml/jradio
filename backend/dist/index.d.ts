@@ -5,6 +5,8 @@ import './db/models/ImagingCategory';
 import './db/models/Requisition';
 import './db/models/RequisitionImagingItem';
 import './db/models/Visit';
+import './db/models/Clinic';
+import './db/models/SiteLocation';
 import './db/models/Assignments';
 import './db/models/BacklogThreshold';
 //# sourceMappingURL=index.d.ts.map

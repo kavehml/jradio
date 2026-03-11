@@ -16,4 +16,5 @@ export declare function verifyToken(token: string): {
     iat: number;
     exp: number;
 };
+export declare function ensureAdminUser(): Promise<void>;
 //# sourceMappingURL=authService.d.ts.map

@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createUser = createUser;
 exports.authenticateUser = authenticateUser;
 exports.verifyToken = verifyToken;
+exports.ensureAdminUser = ensureAdminUser;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = require("../db/models/User");
@@ -45,5 +46,23 @@ function verifyToken(token) {
         throw new Error('Invalid token payload');
     }
     return payload;
+}
+// Ensure there is at least one admin user based on env vars.
+async function ensureAdminUser() {
+    const email = process.env.SEED_ADMIN_EMAIL;
+    const password = process.env.SEED_ADMIN_PASSWORD;
+    if (!email || !password) {
+        return;
+    }
+    const existing = await User_1.User.findOne({ where: { email } });
+    if (existing) {
+        return;
+    }
+    await createUser({
+        name: 'Admin User',
+        email,
+        password,
+        role: 'admin',
+    });
 }
 //# sourceMappingURL=authService.js.map
