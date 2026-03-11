@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { getImagingCategories, createRequisition, getClinics, getSites } from '../api';
+import {
+  getImagingCategories,
+  createRequisition,
+  getClinics,
+  getSites,
+  getPublicImagingCategories,
+  getPublicClinics,
+  getPublicSites,
+} from '../api';
 
 interface Category {
   id: number;
@@ -34,15 +42,22 @@ export const ClericalIntake: React.FC = () => {
   const [mriSequences, setMriSequences] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!token) return;
-    Promise.all([getImagingCategories(token), getClinics(token), getSites(token)])
-      .then(([cats, clinics, sites]) => {
+    const load = async () => {
+      try {
+        // Prefer authenticated endpoints when a token is available, otherwise fall back to public ones.
+        const [cats, clinics, sites] = token
+          ? await Promise.all([getImagingCategories(token), getClinics(token), getSites(token)])
+          : await Promise.all([getPublicImagingCategories(), getPublicClinics(), getPublicSites()]);
         setCategories(cats);
         setClinicOptions(clinics);
         setSiteOptions(sites);
-      })
-      .catch(() => setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' }))
-      .finally(() => setLoading(false));
+      } catch {
+        setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [token]);
 
   function getSubCategoryOptions(cat: Category | null): string[] {
