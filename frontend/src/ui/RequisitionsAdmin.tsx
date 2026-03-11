@@ -2,19 +2,37 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
   approveRequisition,
+  getImagingCategories,
+  getImagingSubCategories,
   getRequisitions,
   RequisitionSummary,
+  updateRequisitionImaging,
   updateRequisitionRvu,
   updateRequisitionSchedule,
 } from '../api';
 
+interface Category {
+  id: number;
+  name: string;
+  modality: string;
+  bodyPart: string;
+  imagePath: string | null;
+}
+
 export const RequisitionsAdmin: React.FC = () => {
   const { token } = useAuth();
   const [rows, setRows] = useState<RequisitionSummary[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subCategoryMap, setSubCategoryMap] = useState<Record<number, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
-  const [localRows, setLocalRows] = useState<Record<number, { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' }>>({});
+  const [localRows, setLocalRows] = useState<
+    Record<number, { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' | 'NA' }>
+  >({});
+  const [localImaging, setLocalImaging] = useState<
+    Record<number, { modality: string; categoryId: number | null; selectedSubCategories: string[] }>
+  >({});
 
   const refresh = () => {
     if (!token) return;
@@ -31,17 +49,45 @@ export const RequisitionsAdmin: React.FC = () => {
   }, [token]);
 
   useEffect(() => {
-    const map: Record<number, { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' }> = {};
+    if (!token) return;
+    Promise.all([getImagingCategories(token), getImagingSubCategories(token)])
+      .then(([cats, subs]) => {
+        setCategories(cats);
+        const map: Record<number, string[]> = {};
+        subs.forEach((s) => {
+          if (!map[s.categoryId]) map[s.categoryId] = [];
+          map[s.categoryId].push(s.name);
+        });
+        setSubCategoryMap(map);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load categories/subcategories'));
+  }, [token]);
+
+  useEffect(() => {
+    const map: Record<number, { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' | 'NA' }> = {};
+    const imagingMap: Record<
+      number,
+      { modality: string; categoryId: number | null; selectedSubCategories: string[] }
+    > = {};
     rows.forEach((r) => {
       const due = r.calculatedDueDate
         ? new Date(r.calculatedDueDate).toISOString().slice(0, 10)
         : new Date().toISOString().slice(0, 10);
-      const scheduled = r.visit?.scheduledDateTime ? new Date(r.visit.scheduledDateTime).getHours() : 8;
-      const shift: 'AM' | 'PM' | 'NIGHT' =
-        scheduled >= 6 && scheduled < 14 ? 'AM' : scheduled >= 14 && scheduled < 22 ? 'PM' : 'NIGHT';
+      const shift: 'AM' | 'PM' | 'NIGHT' | 'NA' = r.visit?.scheduledDateTime
+        ? (() => {
+            const scheduled = new Date(r.visit.scheduledDateTime!).getHours();
+            return scheduled >= 6 && scheduled < 14 ? 'AM' : scheduled >= 14 && scheduled < 22 ? 'PM' : 'NIGHT';
+          })()
+        : 'NA';
       map[r.id] = { dueDate: due, shift };
+      imagingMap[r.id] = {
+        modality: r.imagingItems?.[0]?.modality || '',
+        categoryId: r.imagingItems?.[0]?.categoryId ?? null,
+        selectedSubCategories: r.imagingItems?.[0]?.selectedSubCategories || [],
+      };
     });
     setLocalRows(map);
+    setLocalImaging(imagingMap);
   }, [rows]);
 
   const handleApprove = async (id: number) => {
@@ -70,7 +116,15 @@ export const RequisitionsAdmin: React.FC = () => {
                 imagingItems:
                   r.imagingItems && r.imagingItems.length
                     ? [{ ...r.imagingItems[0], rvuValue: value }]
-                    : [{ rvuValue: value }],
+                    : [
+                        {
+                          rvuValue: value,
+                          modality: '',
+                          categoryId: null,
+                          selectedSubCategories: [],
+                          category: null,
+                        },
+                      ],
               }
             : r
         )
@@ -97,6 +151,25 @@ export const RequisitionsAdmin: React.FC = () => {
     }
   };
 
+  const handleUpdateImaging = async (id: number) => {
+    if (!token) return;
+    const current = localImaging[id];
+    if (!current || !current.modality || current.categoryId == null) return;
+    setSavingId(id);
+    try {
+      await updateRequisitionImaging(token, id, {
+        modality: current.modality,
+        categoryId: current.categoryId,
+        selectedSubCategories: current.selectedSubCategories,
+      });
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update requisition imaging');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <section style={{ maxWidth: 1120, margin: '0 auto' }}>
       <h3 style={{ marginTop: 0 }}>All requisitions</h3>
@@ -115,6 +188,9 @@ export const RequisitionsAdmin: React.FC = () => {
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Clinic</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Site</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Status</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Modality</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Subcategories</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Required specialty</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>RVU</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Created</th>
@@ -135,6 +211,87 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{r.site}</td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9', textTransform: 'capitalize' }}>
                     {r.status.replace(/_/g, ' ')}
+                  </td>
+                  <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                    {r.status === 'pending_approval' ? (
+                      <select
+                        value={localImaging[r.id]?.modality ?? ''}
+                        onChange={(e) =>
+                          setLocalImaging((prev) => ({
+                            ...prev,
+                            [r.id]: {
+                              ...prev[r.id],
+                              modality: e.target.value,
+                              categoryId: null,
+                              selectedSubCategories: [],
+                            },
+                          }))
+                        }
+                      >
+                        <option value="">Select...</option>
+                        {Array.from(new Set(categories.map((c) => c.modality))).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      r.imagingItems?.[0]?.modality || '—'
+                    )}
+                  </td>
+                  <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                    {r.status === 'pending_approval' ? (
+                      <select
+                        value={localImaging[r.id]?.categoryId ?? ''}
+                        onChange={(e) =>
+                          setLocalImaging((prev) => ({
+                            ...prev,
+                            [r.id]: {
+                              ...prev[r.id],
+                              categoryId: Number(e.target.value),
+                              selectedSubCategories: [],
+                            },
+                          }))
+                        }
+                      >
+                        <option value="">Select...</option>
+                        {categories
+                          .filter((c) => c.modality === (localImaging[r.id]?.modality || ''))
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </select>
+                    ) : (
+                      r.imagingItems?.[0]?.category?.name || '—'
+                    )}
+                  </td>
+                  <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                    {r.status === 'pending_approval' ? (
+                      <select
+                        multiple
+                        size={3}
+                        value={localImaging[r.id]?.selectedSubCategories ?? []}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions).map((o) => o.value);
+                          setLocalImaging((prev) => ({
+                            ...prev,
+                            [r.id]: { ...prev[r.id], selectedSubCategories: values },
+                          }));
+                        }}
+                      >
+                        {((localImaging[r.id]?.categoryId &&
+                          subCategoryMap[localImaging[r.id].categoryId!]) ||
+                          []).map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      (r.imagingItems?.[0]?.selectedSubCategories || []).join(', ') || '—'
+                    )}
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     {(r.specialtyRequirement?.requiredSubspecialties || ['general']).join(', ')}
@@ -164,21 +321,22 @@ export const RequisitionsAdmin: React.FC = () => {
                       onChange={(e) =>
                         setLocalRows((prev) => ({
                           ...prev,
-                          [r.id]: { ...(prev[r.id] ?? { shift: 'AM', dueDate: e.target.value }), dueDate: e.target.value },
+                          [r.id]: { ...(prev[r.id] ?? { shift: 'NA', dueDate: e.target.value }), dueDate: e.target.value },
                         }))
                       }
                     />
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     <select
-                      value={localRows[r.id]?.shift ?? 'AM'}
+                      value={localRows[r.id]?.shift ?? 'NA'}
                       onChange={(e) =>
                         setLocalRows((prev) => ({
                           ...prev,
-                          [r.id]: { ...(prev[r.id] ?? { dueDate: new Date().toISOString().slice(0, 10) }), shift: e.target.value as 'AM' | 'PM' | 'NIGHT' },
+                          [r.id]: { ...(prev[r.id] ?? { dueDate: new Date().toISOString().slice(0, 10) }), shift: e.target.value as 'AM' | 'PM' | 'NIGHT' | 'NA' },
                         }))
                       }
                     >
+                      <option value="NA">N/A</option>
                       <option value="AM">AM</option>
                       <option value="PM">PM</option>
                       <option value="NIGHT">Night</option>
@@ -198,6 +356,16 @@ export const RequisitionsAdmin: React.FC = () => {
                         <button
                           type="button"
                           disabled={savingId === r.id}
+                          onClick={() => void handleUpdateImaging(r.id)}
+                          style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
+                        >
+                          {savingId === r.id ? 'Saving…' : 'Save imaging'}
+                        </button>
+                      )}
+                      {r.status === 'pending_approval' && (
+                        <button
+                          type="button"
+                          disabled={savingId === r.id}
                           onClick={() => void handleApprove(r.id)}
                           style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
                         >
@@ -210,7 +378,7 @@ export const RequisitionsAdmin: React.FC = () => {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={12} style={{ padding: '0.75rem', color: '#94a3b8' }}>
+                  <td colSpan={15} style={{ padding: '0.75rem', color: '#94a3b8' }}>
                     No requisitions yet.
                   </td>
                 </tr>

@@ -30,6 +30,34 @@ function computeRvu(bodyParts: string[], modality: string): number {
   return 2;
 }
 
+export async function resolveRequiredSubspecialties(params: {
+  modality: string;
+  categoryId: number;
+  selectedSubCategories?: string[];
+}) {
+  const category = await ImagingCategory.findByPk(params.categoryId, {
+    attributes: ['name'],
+  });
+  const categoryName = category?.name || '';
+  const selectedSubCategories = (params.selectedSubCategories || []).filter(Boolean);
+  let requiredSubspecialties: string[] = [];
+
+  if (selectedSubCategories.length) {
+    const subRules = await SpecialtyRule.findAll({
+      where: {
+        modality: params.modality,
+        categoryName,
+        subCategory: { [Op.in]: selectedSubCategories },
+      },
+    });
+    requiredSubspecialties = Array.from(
+      new Set(subRules.flatMap((r) => r.requiredSubspecialties || []))
+    );
+  }
+  if (!requiredSubspecialties.length) requiredSubspecialties = ['general'];
+  return requiredSubspecialties;
+}
+
 export async function createRequisition(params: {
   patientIdOrTempLabel: string;
   isNewExternalPatient: boolean;
@@ -77,6 +105,7 @@ export async function createRequisition(params: {
     requisitionId: requisition.id,
     modality: params.modality,
     bodyParts: params.bodyParts,
+    selectedSubCategories: params.selectedSubCategories || [],
     withContrast: params.withContrast ?? false,
     specialNotes: params.notes ?? null,
     rvuValue,
@@ -91,27 +120,13 @@ export async function createRequisition(params: {
     location: params.site,
   });
 
-  const category = await ImagingCategory.findByPk(params.categoryId, {
-    attributes: ['name'],
+  const requiredSubspecialties = await resolveRequiredSubspecialties({
+    modality: params.modality,
+    categoryId: params.categoryId,
+    ...(params.selectedSubCategories !== undefined && {
+      selectedSubCategories: params.selectedSubCategories,
+    }),
   });
-  const categoryName = category?.name || '';
-  const selectedSubCategories = (params.selectedSubCategories || []).filter(Boolean);
-  let requiredSubspecialties: string[] = [];
-
-  if (selectedSubCategories.length) {
-    const subRules = await SpecialtyRule.findAll({
-      where: {
-        modality: params.modality,
-        categoryName,
-        subCategory: { [Op.in]: selectedSubCategories },
-      },
-    });
-    requiredSubspecialties = Array.from(
-      new Set(subRules.flatMap((r) => r.requiredSubspecialties || []))
-    );
-  }
-
-  if (!requiredSubspecialties.length) requiredSubspecialties = ['general'];
 
   await RequisitionSpecialtyRequirement.create({
     requisitionId: requisition.id,

@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { createRequisition } from '../services/requisitionService';
+import { createRequisition, resolveRequiredSubspecialties } from '../services/requisitionService';
 import { Requisition } from '../db/models/Requisition';
 import { Visit } from '../db/models/Visit';
 import { RequisitionImagingItem } from '../db/models/RequisitionImagingItem';
 import { RequisitionSpecialtyRequirement } from '../db/models/RequisitionSpecialtyRequirement';
+import { ImagingCategory } from '../db/models/ImagingCategory';
 
 const router = Router();
 
@@ -141,7 +142,8 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
         {
           model: RequisitionImagingItem,
           as: 'imagingItems',
-          attributes: ['rvuValue'],
+          attributes: ['rvuValue', 'modality', 'categoryId', 'selectedSubCategories'],
+          include: [{ model: ImagingCategory, as: 'category', attributes: ['id', 'name'] }],
         },
         {
           model: RequisitionSpecialtyRequirement,
@@ -170,7 +172,7 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
 // Update due date and shift (scheduledDateTime) for a requisition
 router.patch('/:id/schedule', requireAuth, requireRole(['admin', 'radiologist']), async (req, res) => {
   const id = Number(req.params.id);
-  const { dueDate, shift } = req.body as { dueDate?: string; shift?: 'AM' | 'PM' | 'NIGHT' };
+  const { dueDate, shift } = req.body as { dueDate?: string; shift?: 'AM' | 'PM' | 'NIGHT' | 'NA' };
   if (!Number.isFinite(id) || !dueDate || !shift) {
     return res.status(400).json({ error: 'dueDate and shift are required' });
   }
@@ -191,7 +193,7 @@ router.patch('/:id/schedule', requireAuth, requireRole(['admin', 'radiologist'])
 
     const visit = await Visit.findOne({ where: { requisitionId: id } });
     if (visit) {
-      visit.scheduledDateTime = scheduled;
+      visit.scheduledDateTime = shift === 'NA' ? null : scheduled;
       await visit.save();
     }
 
@@ -203,6 +205,70 @@ router.patch('/:id/schedule', requireAuth, requireRole(['admin', 'radiologist'])
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to update schedule' });
+  }
+});
+
+// Update imaging category/subcategories before approval
+router.patch('/:id/imaging', requireAuth, requireRole(['admin', 'radiologist']), async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body as {
+    modality?: string;
+    categoryId?: number;
+    selectedSubCategories?: string[];
+  };
+  if (!Number.isFinite(id) || !body.modality || body.categoryId == null) {
+    return res.status(400).json({ error: 'modality and categoryId are required' });
+  }
+  try {
+    const reqn = await Requisition.findByPk(id);
+    if (!reqn) return res.status(404).json({ error: 'Requisition not found' });
+    const item = await RequisitionImagingItem.findOne({ where: { requisitionId: id } });
+    if (!item) return res.status(404).json({ error: 'Imaging item not found for requisition' });
+
+    const category = await ImagingCategory.findByPk(body.categoryId);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+
+    const selectedSubCategories = Array.isArray(body.selectedSubCategories)
+      ? body.selectedSubCategories.filter(Boolean)
+      : [];
+
+    item.modality = body.modality;
+    item.categoryId = body.categoryId;
+    item.bodyParts = [category.bodyPart];
+    item.selectedSubCategories = selectedSubCategories;
+    item.specialNotes = selectedSubCategories.length
+      ? `Exams: ${selectedSubCategories.join(', ')}`
+      : item.specialNotes;
+    await item.save();
+
+    let requirement = await RequisitionSpecialtyRequirement.findOne({
+      where: { requisitionId: id },
+    });
+    const requiredSubspecialties = await resolveRequiredSubspecialties({
+      modality: body.modality,
+      categoryId: body.categoryId,
+      selectedSubCategories,
+    });
+    if (!requirement) {
+      requirement = await RequisitionSpecialtyRequirement.create({
+        requisitionId: id,
+        requiredSubspecialties,
+      });
+    } else {
+      requirement.requiredSubspecialties = requiredSubspecialties;
+      await requirement.save();
+    }
+
+    return res.json({
+      requisitionId: id,
+      modality: item.modality,
+      categoryId: item.categoryId,
+      selectedSubCategories: item.selectedSubCategories,
+      requiredSubspecialties: requirement.requiredSubspecialties,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update requisition imaging details' });
   }
 });
 

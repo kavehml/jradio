@@ -273,7 +273,13 @@ export interface RequisitionSummary {
   calculatedDueDate: string | null;
   createdAt: string;
   visit?: { visitNumber: string | null; scheduledDateTime?: string | null } | null;
-  imagingItems?: { rvuValue: number }[];
+  imagingItems?: {
+    rvuValue: number;
+    modality: string;
+    categoryId: number | null;
+    selectedSubCategories: string[];
+    category?: { id: number; name: string } | null;
+  }[];
   specialtyRequirement?: { requiredSubspecialties: string[] } | null;
 }
 
@@ -297,7 +303,7 @@ export async function getRequisitions(token: string) {
 export async function updateRequisitionSchedule(
   token: string,
   id: number,
-  data: { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' }
+  data: { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' | 'NA' }
 ) {
   const res = await fetch(`${getApiBase()}/api/requisitions/${id}/schedule`, {
     method: 'PATCH',
@@ -315,6 +321,32 @@ export async function updateRequisitionSchedule(
     id: number;
     calculatedDueDate: string | null;
     scheduledDateTime: string | null;
+  }>;
+}
+
+export async function updateRequisitionImaging(
+  token: string,
+  id: number,
+  data: { modality: string; categoryId: number; selectedSubCategories: string[] }
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/${id}/imaging`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update imaging details');
+  }
+  return res.json() as Promise<{
+    requisitionId: number;
+    modality: string;
+    categoryId: number;
+    selectedSubCategories: string[];
+    requiredSubspecialties: string[];
   }>;
 }
 
