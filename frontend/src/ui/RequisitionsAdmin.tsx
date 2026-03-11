@@ -29,6 +29,19 @@ function parseSubCategoriesFromNotes(notes?: string | null): string[] {
     .filter(Boolean);
 }
 
+function modalityForUi(item?: {
+  modality: string;
+  category?: { id: number; name: string } | null;
+}): string {
+  if (!item) return '';
+  if (item.modality === 'Other') {
+    const categoryName = item.category?.name?.toUpperCase() || '';
+    if (categoryName.startsWith('PET ')) return 'PET';
+    if (categoryName.startsWith('XR ')) return 'X-ray';
+  }
+  return item.modality;
+}
+
 export const RequisitionsAdmin: React.FC = () => {
   const { token } = useAuth();
   const [rows, setRows] = useState<RequisitionSummary[]>([]);
@@ -47,6 +60,20 @@ export const RequisitionsAdmin: React.FC = () => {
   const resolveCategoryModality = (modality: string) => {
     if (modality === 'PET' || modality === 'X-ray') return 'Other';
     return modality;
+  };
+
+  const getRowImaging = (r: RequisitionSummary) => {
+    const item = r.imagingItems?.[0];
+    return (
+      localImaging[r.id] || {
+        modality: modalityForUi(item),
+        categoryId: item?.categoryId ?? null,
+        selectedSubCategories:
+          item?.selectedSubCategories?.length
+            ? item.selectedSubCategories
+            : parseSubCategoriesFromNotes(item?.specialNotes),
+      }
+    );
   };
 
   const refresh = () => {
@@ -85,6 +112,7 @@ export const RequisitionsAdmin: React.FC = () => {
       { modality: string; categoryId: number | null; selectedSubCategories: string[] }
     > = {};
     rows.forEach((r) => {
+      const item = r.imagingItems?.[0];
       const due = r.calculatedDueDate
         ? new Date(r.calculatedDueDate).toISOString().slice(0, 10)
         : new Date().toISOString().slice(0, 10);
@@ -96,12 +124,12 @@ export const RequisitionsAdmin: React.FC = () => {
         : 'NA';
       map[r.id] = { dueDate: due, shift };
       imagingMap[r.id] = {
-        modality: r.imagingItems?.[0]?.modality || '',
-        categoryId: r.imagingItems?.[0]?.categoryId ?? null,
+        modality: modalityForUi(item),
+        categoryId: item?.categoryId ?? null,
         selectedSubCategories:
-          r.imagingItems?.[0]?.selectedSubCategories?.length
-            ? r.imagingItems?.[0]?.selectedSubCategories
-            : parseSubCategoriesFromNotes(r.imagingItems?.[0]?.specialNotes),
+          item?.selectedSubCategories?.length
+            ? item.selectedSubCategories
+            : parseSubCategoriesFromNotes(item?.specialNotes),
       };
     });
     setLocalRows(map);
@@ -189,9 +217,11 @@ export const RequisitionsAdmin: React.FC = () => {
   };
 
   const getCategoryOptions = (rowId: number) => {
-    const currentModality = localImaging[rowId]?.modality || '';
+    const row = rows.find((r) => r.id === rowId);
+    const current = row ? getRowImaging(row) : undefined;
+    const currentModality = current?.modality || '';
     const opts = categories.filter((c) => c.modality === resolveCategoryModality(currentModality));
-    const currentCatId = localImaging[rowId]?.categoryId;
+    const currentCatId = current?.categoryId;
     const currentCat =
       rows.find((r) => r.id === rowId)?.imagingItems?.[0]?.category ||
       categories.find((c) => c.id === currentCatId);
@@ -202,10 +232,12 @@ export const RequisitionsAdmin: React.FC = () => {
   };
 
   const getSubCategoryOptionsForRow = (rowId: number) => {
-    const categoryId = localImaging[rowId]?.categoryId;
-    if (!categoryId) return localImaging[rowId]?.selectedSubCategories || [];
+    const row = rows.find((r) => r.id === rowId);
+    const current = row ? getRowImaging(row) : undefined;
+    const categoryId = current?.categoryId;
+    if (!categoryId) return current?.selectedSubCategories || [];
     const dynamic = subCategoryMap[categoryId] || [];
-    const selected = localImaging[rowId]?.selectedSubCategories || [];
+    const selected = current?.selectedSubCategories || [];
     return Array.from(new Set([...dynamic, ...selected]));
   };
 
@@ -254,7 +286,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     {r.status === 'pending_approval' ? (
                       <select
-                        value={localImaging[r.id]?.modality ?? ''}
+                        value={getRowImaging(r).modality ?? ''}
                         onChange={(e) =>
                           setLocalImaging((prev) => ({
                             ...prev,
@@ -271,7 +303,7 @@ export const RequisitionsAdmin: React.FC = () => {
                         {Array.from(
                           new Set([
                             ...categories.map((c) => c.modality),
-                            localImaging[r.id]?.modality || '',
+                            getRowImaging(r).modality || '',
                           ].filter(Boolean))
                         ).map((m) => (
                           <option key={m} value={m}>
@@ -286,7 +318,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     {r.status === 'pending_approval' ? (
                       <select
-                        value={localImaging[r.id]?.categoryId ?? ''}
+                        value={getRowImaging(r).categoryId ?? ''}
                         onChange={(e) =>
                           setLocalImaging((prev) => ({
                             ...prev,
@@ -314,7 +346,7 @@ export const RequisitionsAdmin: React.FC = () => {
                       <select
                         multiple
                         size={3}
-                        value={localImaging[r.id]?.selectedSubCategories ?? []}
+                        value={getRowImaging(r).selectedSubCategories ?? []}
                         onChange={(e) => {
                           const values = Array.from(e.target.selectedOptions).map((o) => o.value);
                           setLocalImaging((prev) => ({
