@@ -19,6 +19,7 @@ import importExportRoutes from './routes/importExportRoutes';
 import imagingCategoriesRoutes from './routes/imagingCategoriesRoutes';
 import requisitionsRoutes from './routes/requisitionsRoutes';
 import metaRoutes from './routes/metaRoutes';
+import shiftsRoutes from './routes/shiftsRoutes';
 import { ensureAdminUser } from './services/authService';
 import { seedImagingCategoriesIfEmpty } from './services/seedImagingCategories';
 
@@ -40,6 +41,7 @@ async function bootstrap() {
   app.use('/api/imaging-categories', imagingCategoriesRoutes);
   app.use('/api/requisitions', requisitionsRoutes);
   app.use('/api/meta', metaRoutes);
+  app.use('/api/shifts', shiftsRoutes);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
