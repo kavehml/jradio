@@ -232,7 +232,7 @@ export interface RequisitionSummary {
   status: string;
   calculatedDueDate: string | null;
   createdAt: string;
-  visit?: { visitNumber: string | null } | null;
+  visit?: { visitNumber: string | null; scheduledDateTime?: string | null } | null;
   imagingItems?: { rvuValue: number }[];
 }
 
@@ -243,6 +243,30 @@ export async function getRequisitions(token: string) {
   if (!res.ok) throw new Error('Failed to load requisitions');
   const json = (await res.json()) as { requisitions: RequisitionSummary[] };
   return json.requisitions;
+}
+
+export async function updateRequisitionSchedule(
+  token: string,
+  id: number,
+  data: { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' }
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/${id}/schedule`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update schedule');
+  }
+  return res.json() as Promise<{
+    id: number;
+    calculatedDueDate: string | null;
+    scheduledDateTime: string | null;
+  }>;
 }
 
 export async function approveRequisition(token: string, id: number) {

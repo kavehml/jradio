@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { approveRequisition, getRequisitions, RequisitionSummary, updateRequisitionRvu } from '../api';
+import {
+  approveRequisition,
+  getRequisitions,
+  RequisitionSummary,
+  updateRequisitionRvu,
+  updateRequisitionSchedule,
+} from '../api';
 
 export const RequisitionsAdmin: React.FC = () => {
   const { token } = useAuth();
@@ -8,6 +14,7 @@ export const RequisitionsAdmin: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [localRows, setLocalRows] = useState<Record<number, { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' }>>({});
 
   const refresh = () => {
     if (!token) return;
@@ -22,6 +29,20 @@ export const RequisitionsAdmin: React.FC = () => {
   useEffect(() => {
     refresh();
   }, [token]);
+
+  useEffect(() => {
+    const map: Record<number, { dueDate: string; shift: 'AM' | 'PM' | 'NIGHT' }> = {};
+    rows.forEach((r) => {
+      const due = r.calculatedDueDate
+        ? new Date(r.calculatedDueDate).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const scheduled = r.visit?.scheduledDateTime ? new Date(r.visit.scheduledDateTime).getHours() : 8;
+      const shift: 'AM' | 'PM' | 'NIGHT' =
+        scheduled >= 6 && scheduled < 14 ? 'AM' : scheduled >= 14 && scheduled < 22 ? 'PM' : 'NIGHT';
+      map[r.id] = { dueDate: due, shift };
+    });
+    setLocalRows(map);
+  }, [rows]);
 
   const handleApprove = async (id: number) => {
     if (!token) return;
@@ -61,6 +82,21 @@ export const RequisitionsAdmin: React.FC = () => {
     }
   };
 
+  const handleUpdateSchedule = async (id: number) => {
+    if (!token) return;
+    const current = localRows[id];
+    if (!current) return;
+    setSavingId(id);
+    try {
+      await updateRequisitionSchedule(token, id, current);
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update schedule');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <section style={{ marginTop: '1.5rem' }}>
       <h3 style={{ marginTop: 0 }}>All requisitions</h3>
@@ -82,6 +118,7 @@ export const RequisitionsAdmin: React.FC = () => {
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>RVU</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Created</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Due date</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Shift</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Actions</th>
               </tr>
             </thead>
@@ -117,21 +154,53 @@ export const RequisitionsAdmin: React.FC = () => {
                     {new Date(r.createdAt).toLocaleString()}
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-                    {r.calculatedDueDate ? new Date(r.calculatedDueDate).toLocaleDateString() : '—'}
+                    <input
+                      type="date"
+                      value={localRows[r.id]?.dueDate ?? ''}
+                      onChange={(e) =>
+                        setLocalRows((prev) => ({
+                          ...prev,
+                          [r.id]: { ...(prev[r.id] ?? { shift: 'AM', dueDate: e.target.value }), dueDate: e.target.value },
+                        }))
+                      }
+                    />
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-                    {r.status === 'pending_approval' ? (
+                    <select
+                      value={localRows[r.id]?.shift ?? 'AM'}
+                      onChange={(e) =>
+                        setLocalRows((prev) => ({
+                          ...prev,
+                          [r.id]: { ...(prev[r.id] ?? { dueDate: new Date().toISOString().slice(0, 10) }), shift: e.target.value as 'AM' | 'PM' | 'NIGHT' },
+                        }))
+                      }
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                      <option value="NIGHT">Night</option>
+                    </select>
+                  </td>
+                  <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         type="button"
                         disabled={savingId === r.id}
-                        onClick={() => void handleApprove(r.id)}
+                        onClick={() => void handleUpdateSchedule(r.id)}
                         style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
                       >
-                        {savingId === r.id ? 'Saving…' : 'Approve'}
+                        {savingId === r.id ? 'Saving…' : 'Save schedule'}
                       </button>
-                    ) : (
-                      <span style={{ color: '#94a3b8' }}>—</span>
-                    )}
+                      {r.status === 'pending_approval' && (
+                        <button
+                          type="button"
+                          disabled={savingId === r.id}
+                          onClick={() => void handleApprove(r.id)}
+                          style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
+                        >
+                          {savingId === r.id ? 'Saving…' : 'Approve'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -129,7 +129,7 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
         {
           model: Visit,
           as: 'visit',
-          attributes: ['visitNumber'],
+          attributes: ['visitNumber', 'scheduledDateTime'],
         },
         {
           model: RequisitionImagingItem,
@@ -152,6 +152,45 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load requisitions' });
+  }
+});
+
+// Update due date and shift (scheduledDateTime) for a requisition
+router.patch('/:id/schedule', requireAuth, requireRole(['admin', 'radiologist']), async (req, res) => {
+  const id = Number(req.params.id);
+  const { dueDate, shift } = req.body as { dueDate?: string; shift?: 'AM' | 'PM' | 'NIGHT' };
+  if (!Number.isFinite(id) || !dueDate || !shift) {
+    return res.status(400).json({ error: 'dueDate and shift are required' });
+  }
+  const baseDate = new Date(dueDate);
+  if (Number.isNaN(baseDate.getTime())) {
+    return res.status(400).json({ error: 'Invalid dueDate' });
+  }
+  const scheduled = new Date(baseDate);
+  if (shift === 'AM') scheduled.setHours(8, 0, 0, 0);
+  if (shift === 'PM') scheduled.setHours(16, 0, 0, 0);
+  if (shift === 'NIGHT') scheduled.setHours(0, 0, 0, 0);
+
+  try {
+    const reqn = await Requisition.findByPk(id);
+    if (!reqn) return res.status(404).json({ error: 'Requisition not found' });
+    reqn.calculatedDueDate = baseDate;
+    await reqn.save();
+
+    const visit = await Visit.findOne({ where: { requisitionId: id } });
+    if (visit) {
+      visit.scheduledDateTime = scheduled;
+      await visit.save();
+    }
+
+    return res.json({
+      id: reqn.id,
+      calculatedDueDate: reqn.calculatedDueDate,
+      scheduledDateTime: visit?.scheduledDateTime ?? null,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update schedule' });
   }
 });
 
