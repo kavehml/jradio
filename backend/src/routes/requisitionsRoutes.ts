@@ -35,21 +35,22 @@ router.post('/', requireAuth, requireRole(['admin', 'clerical']), async (req, re
   }
 
   try {
-    const result = await createRequisition({
+    const params = {
       patientIdOrTempLabel: body.patientIdOrTempLabel,
       isNewExternalPatient: !!body.isNewExternalPatient,
       orderingDoctorName: body.orderingDoctorName,
       orderingClinic: body.orderingClinic,
       site: body.site,
-      dateOfRequest: body.dateOfRequest,
-      timeDelayPreset: body.timeDelayPreset,
-      hasImagingWithin24h: body.hasImagingWithin24h,
       categoryId: body.categoryId,
       modality: body.modality,
       bodyParts: Array.isArray(body.bodyParts) ? body.bodyParts : [body.modality],
-      withContrast: body.withContrast,
-      notes: body.notes,
-    });
+      ...(body.dateOfRequest !== undefined && body.dateOfRequest !== '' && { dateOfRequest: body.dateOfRequest }),
+      ...(body.timeDelayPreset !== undefined && body.timeDelayPreset !== '' && { timeDelayPreset: body.timeDelayPreset }),
+      ...(body.hasImagingWithin24h !== undefined && { hasImagingWithin24h: body.hasImagingWithin24h }),
+      ...(body.withContrast !== undefined && { withContrast: body.withContrast }),
+      ...(body.notes !== undefined && body.notes !== '' && { notes: body.notes }),
+    };
+    const result = await createRequisition(params);
     return res.status(201).json(result);
   } catch (err) {
     console.error(err);
