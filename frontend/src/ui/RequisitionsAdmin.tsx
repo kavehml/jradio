@@ -19,6 +19,16 @@ interface Category {
   imagePath: string | null;
 }
 
+function parseSubCategoriesFromNotes(notes?: string | null): string[] {
+  if (!notes) return [];
+  const match = notes.match(/Exams:\s*([^·]+)/i);
+  if (!match?.[1]) return [];
+  return match[1]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export const RequisitionsAdmin: React.FC = () => {
   const { token } = useAuth();
   const [rows, setRows] = useState<RequisitionSummary[]>([]);
@@ -33,6 +43,11 @@ export const RequisitionsAdmin: React.FC = () => {
   const [localImaging, setLocalImaging] = useState<
     Record<number, { modality: string; categoryId: number | null; selectedSubCategories: string[] }>
   >({});
+
+  const resolveCategoryModality = (modality: string) => {
+    if (modality === 'PET' || modality === 'X-ray') return 'Other';
+    return modality;
+  };
 
   const refresh = () => {
     if (!token) return;
@@ -83,7 +98,10 @@ export const RequisitionsAdmin: React.FC = () => {
       imagingMap[r.id] = {
         modality: r.imagingItems?.[0]?.modality || '',
         categoryId: r.imagingItems?.[0]?.categoryId ?? null,
-        selectedSubCategories: r.imagingItems?.[0]?.selectedSubCategories || [],
+        selectedSubCategories:
+          r.imagingItems?.[0]?.selectedSubCategories?.length
+            ? r.imagingItems?.[0]?.selectedSubCategories
+            : parseSubCategoriesFromNotes(r.imagingItems?.[0]?.specialNotes),
       };
     });
     setLocalRows(map);
@@ -172,7 +190,7 @@ export const RequisitionsAdmin: React.FC = () => {
 
   const getCategoryOptions = (rowId: number) => {
     const currentModality = localImaging[rowId]?.modality || '';
-    const opts = categories.filter((c) => c.modality === currentModality);
+    const opts = categories.filter((c) => c.modality === resolveCategoryModality(currentModality));
     const currentCatId = localImaging[rowId]?.categoryId;
     const currentCat =
       rows.find((r) => r.id === rowId)?.imagingItems?.[0]?.category ||
@@ -250,7 +268,12 @@ export const RequisitionsAdmin: React.FC = () => {
                         }
                       >
                         <option value="">Select...</option>
-                        {Array.from(new Set(categories.map((c) => c.modality))).map((m) => (
+                        {Array.from(
+                          new Set([
+                            ...categories.map((c) => c.modality),
+                            localImaging[r.id]?.modality || '',
+                          ].filter(Boolean))
+                        ).map((m) => (
                           <option key={m} value={m}>
                             {m}
                           </option>
@@ -307,7 +330,11 @@ export const RequisitionsAdmin: React.FC = () => {
                         ))}
                       </select>
                     ) : (
-                      (r.imagingItems?.[0]?.selectedSubCategories || []).join(', ') || '—'
+                      (
+                        (r.imagingItems?.[0]?.selectedSubCategories?.length
+                          ? r.imagingItems?.[0]?.selectedSubCategories
+                          : parseSubCategoriesFromNotes(r.imagingItems?.[0]?.specialNotes)) || []
+                      ).join(', ') || '—'
                     )}
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>

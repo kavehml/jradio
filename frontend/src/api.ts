@@ -278,6 +278,7 @@ export interface RequisitionSummary {
     modality: string;
     categoryId: number | null;
     selectedSubCategories: string[];
+    specialNotes?: string | null;
     category?: { id: number; name: string } | null;
   }[];
   specialtyRequirement?: { requiredSubspecialties: string[] } | null;

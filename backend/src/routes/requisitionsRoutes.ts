@@ -142,7 +142,7 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
         {
           model: RequisitionImagingItem,
           as: 'imagingItems',
-          attributes: ['rvuValue', 'modality', 'categoryId', 'selectedSubCategories'],
+          attributes: ['rvuValue', 'modality', 'categoryId', 'selectedSubCategories', 'specialNotes'],
           include: [{ model: ImagingCategory, as: 'category', attributes: ['id', 'name'] }],
         },
         {
