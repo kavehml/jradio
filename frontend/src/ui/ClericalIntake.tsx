@@ -45,60 +45,178 @@ export const ClericalIntake: React.FC = () => {
       .finally(() => setLoading(false));
   }, [token]);
 
+  function getSubCategoryOptions(cat: Category | null): string[] {
+    if (!cat) return [];
+    const name = cat.name.toUpperCase();
+    if (cat.modality === 'CT') {
+      switch (name) {
+        case 'MISCELLANEOUS CT':
+          return [
+            'CT Head C-',
+            'CT Head C+',
+            'CT C1A1',
+            'CT A1 C+ with Oral',
+            'CT C1 C+',
+            'CT C3 C- Low Dose',
+            'CT R3 Low Dose',
+            'CT Neck C+',
+            'CT Sinuses C-',
+          ];
+        case 'CT ABDO':
+          return [
+            'CT A1 C+ with Oral',
+            'CT A1 C+ without Oral',
+            'CT A2 C- with Oral',
+            'CT Abdo Venogram',
+            'CT Adrenals C-/C+',
+            'CT Cystogram',
+            'CT Enterography',
+            'CT Fistulogram',
+            'CT L1 Triphasic',
+            'CT Mesenteric Ischemia CTA/PV',
+            'CT P1',
+            'CT R1',
+            'CT R2 Adrenals C-',
+            'CT R3 Low Dose',
+            'CT RH (Hematuria)',
+            'CT Virtual Colonoscopy',
+            'CTA Abdo/Pelvis (Bleed protocol)',
+            'CTA Abdo/Pelvis',
+            'CTA Abdo/Pelvis Runoff',
+          ];
+        case 'CT CHEST':
+          return [
+            'CT Apollo',
+            'CT C1 C+',
+            'CT C1A (Chest + upper Abdo C+)',
+            'CT C1A1',
+            'CT C1L1 (Chest + Abdo C-/C+)',
+            'CT C1R1 (Chest + Abdo C-/C+)',
+            'CT C2 C-',
+            'CT C2A (Chest + upper Abdo C-)',
+            'CT C2A2',
+            'CT C3 C- Low Dose',
+            'CT Calcium Score',
+            'CT Cardiac Prospective',
+            'CT Cardiac Retrospective',
+            'CT Chest C- Low dose PODCP',
+            'CT PE',
+            'CT LA Appendage',
+            'CT PE + Abdo',
+            'CT Venogram Chest',
+            'CTA C/A/P (Bleed protocol)',
+            'CTA C/A/P',
+            'CTA Chest (Bleed protocol)',
+            'CTA Chest',
+            'CTA Chest Gated',
+            'CTA Chest / upper ext. Runoff',
+            'CTA Dissection Gated',
+            'CTA Mitral Valve',
+            'CTA TAVI',
+          ];
+        case 'CT EXTREMITIES':
+          return [
+            'CT Elbow C-',
+            'CT Elbow C+',
+            'CT Forearm C-',
+            'CT Forearm C+',
+            'CT Hand C-',
+            'CT Hand C+',
+            'CT Humerus C-',
+            'CT Humerus C+',
+            'CT Shoulder C-',
+            'CT Shoulder C+',
+            'CT Sternoclavicular joint C-',
+            'CT Sternoclavicular joint C+',
+            'CT Wrist C-',
+            'CT Wrist C+',
+            'CT Ankle C-',
+            'CT Ankle C+',
+            'CT Femur C-',
+            'CT Femur C+',
+            'CT Foot C-',
+            'CT Foot C+',
+            'CT Knee C-',
+            'CT Knee C+',
+            'CT Prophecy',
+            'CT Sternum C-',
+            'CT Sternum C+',
+            'CT TibFib C-',
+            'CT TibFib C+',
+            'CTA Lower Extremities',
+            'CTA Upper Extremities',
+          ];
+        case 'CT HEAD':
+          return [
+            'CT Code Stroke C-/CTA H/N',
+            'CT Facial Bones C-',
+            'CT Facial Bones C+',
+            'CT Head C-',
+            'CT Head C-/C+',
+            'CT Head C+',
+            'CT Head Neuronavigation C-',
+            'CT Head Neuronavigation C+',
+            'CT Orbits C-',
+            'CT Orbits C+',
+            'CT Sella C-',
+            'CT Sella C+',
+            'CT Sinuses C-',
+            'CT Sinuses C+',
+            'CT Temporal Bones C-',
+            'CT Temporal Bones C+',
+            'CT Venogram of the Head',
+            'CTA Head and Neck C-/CTA',
+            'CTA Head C-/CTA',
+          ];
+        case 'CT NECK':
+          return [
+            'CT add Phonation',
+            'CT add Puffed Cheeks',
+            'CT add Skin Marker',
+            'CT add Tongue Depressor',
+            'CT add Tongue Out',
+            'CT Neck C-',
+            'CT Neck C+',
+            'CT Neck C+ GSI',
+            'CT Neck C+ with Barium Paste',
+            'CT Neck Parotids C-/C+',
+            'CT Neck Parotids C-/C+ GSI',
+            'CT Parathyroid Perfusion',
+            'CTA Carotids',
+          ];
+        case 'CT PELVIS':
+          return [
+            'CT Hip C-',
+            'CT Hip C+',
+            'CT Pelvis C-',
+            'CT Pelvis C+',
+            'CT Sacrum/Coccyx C-',
+            'CT Sacrum/Coccyx C+',
+          ];
+        case 'CT SPINE':
+          return [
+            'CT C Spine C-',
+            'CT C Spine C+',
+            'CT L Spine C-',
+            'CT L Spine C+',
+            'CT T Spine C-',
+            'CT T Spine C+',
+            'CT Myelogram',
+            'CT Spine Neuronavigation',
+            'CT Total Spine C-',
+            'CT Total Spine C+',
+          ];
+        default:
+          return [];
+      }
+    }
+    // Other modalities not yet enumerated
+    return [];
+  }
+
   const filteredCategories = modality
     ? categories.filter((c) => c.modality.toLowerCase() === modality.toLowerCase())
     : categories;
-
-  function getSubCategoryOptions(cat: Category | null): string[] {
-    if (!cat) return [];
-    const name = cat.name.toLowerCase();
-    if (name.includes('extremit')) {
-      return [
-        'CT Elbow C-',
-        'CT Elbow C+',
-        'CT Forearm C-',
-        'CT Forearm C+',
-        'CT Hand C-',
-        'CT Hand C+',
-        'CT Humerus C-',
-        'CT Humerus C+',
-        'CT Shoulder C-',
-        'CT Shoulder C+',
-        'CT Sternoclavicular joint C-',
-        'CT Sternoclavicular joint C+',
-        'CT Wrist C-',
-        'CT Wrist C+',
-        'CT Ankle C-',
-        'CT Ankle C+',
-        'CT Femur C-',
-        'CT Femur C+',
-        'CT Foot C-',
-        'CT Foot C+',
-        'CT Knee C-',
-        'CT Knee C+',
-        'CT TibFib C-',
-        'CT TibFib C+',
-        'CTA Lower Extremities',
-        'CTA Upper Extremities',
-      ];
-    }
-    if (name.includes('head')) {
-      return ['CT Head C-', 'CT Head C+', 'CT Code Stroke C-/CTA H/N', 'CTA Head and Neck'];
-    }
-    if (name.includes('neck')) {
-      return ['CT Neck C-', 'CT Neck C+', 'CT Neck C+ with Barium Paste', 'CTA Carotids'];
-    }
-    if (name.includes('chest')) {
-      return ['CT Chest C-', 'CT Chest C+', 'CTA Chest', 'CTA C/A/P (bleed)'];
-    }
-    if (name.includes('abdo') || name.includes('abdomen') || name.includes('pelvis')) {
-      return ['CT Abdo C-', 'CT Abdo C+', 'CT Pelvis C-', 'CT Pelvis C+', 'CT Virtual Colonoscopy', 'CTA Abdo/Pelvis'];
-    }
-    if (name.includes('spine')) {
-      return ['CT C Spine', 'CT T Spine', 'CT L Spine', 'CT Total Spine', 'CT Myelogram'];
-    }
-    return [];
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
