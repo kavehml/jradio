@@ -7,6 +7,7 @@ import { AppLayout } from './ui/AppLayout';
 import { RadiologistDashboard } from './ui/RadiologistDashboard';
 import { ClericalIntake } from './ui/ClericalIntake';
 import { AdminDashboard } from './ui/AdminDashboard';
+import { PublicRequisitionForm } from './ui/PublicRequisitionForm';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
@@ -20,6 +21,7 @@ const Root = () => (
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/external-requisition" element={<PublicRequisitionForm />} />
         <Route
           path="/"
           element={

@@ -5,7 +5,7 @@ import { SiteLocation } from '../db/models/SiteLocation';
 
 const router = Router();
 
-// Clinics
+// Clinics (authenticated)
 router.get('/clinics', requireAuth, async (_req, res) => {
   try {
     const clinics = await Clinic.findAll({ order: [['name', 'ASC']] });
@@ -35,7 +35,7 @@ router.post('/clinics', requireAuth, requireRole(['admin']), async (req, res) =>
   }
 });
 
-// Site locations
+// Site locations (authenticated)
 router.get('/sites', requireAuth, async (_req, res) => {
   try {
     const sites = await SiteLocation.findAll({ order: [['name', 'ASC']] });
@@ -62,6 +62,31 @@ router.post('/sites', requireAuth, requireRole(['admin']), async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to create site' });
+  }
+});
+
+// Public read‑only endpoints for external requisition form
+router.get('/public/clinics', async (_req, res) => {
+  try {
+    const clinics = await Clinic.findAll({ order: [['name', 'ASC']] });
+    return res.json({
+      clinics: clinics.map((c) => ({ id: c.id, name: c.name })),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load clinics' });
+  }
+});
+
+router.get('/public/sites', async (_req, res) => {
+  try {
+    const sites = await SiteLocation.findAll({ order: [['name', 'ASC']] });
+    return res.json({
+      sites: sites.map((s) => ({ id: s.id, name: s.name })),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load sites' });
   }
 });
 

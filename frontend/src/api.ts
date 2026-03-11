@@ -103,6 +103,14 @@ export async function getImagingCategories(token: string) {
   >;
 }
 
+export async function getPublicImagingCategories() {
+  const res = await fetch(`${getApiBase()}/api/imaging-categories/public`);
+  if (!res.ok) throw new Error('Failed to load categories');
+  return res.json() as Promise<
+    { id: number; name: string; modality: string; bodyPart: string; imagePath: string | null }[]
+  >;
+}
+
 export async function createRequisition(
   token: string,
   data: {
@@ -136,10 +144,48 @@ export async function createRequisition(
   return res.json();
 }
 
+export async function createPublicRequisition(
+  data: {
+    patientIdOrTempLabel: string;
+    isNewExternalPatient: boolean;
+    orderingDoctorName: string;
+    orderingClinic: string;
+    site: string;
+    dateOfRequest?: string;
+    timeDelayPreset?: string;
+    hasImagingWithin24h?: boolean;
+    categoryId: number;
+    modality: string;
+    bodyParts: string[];
+    withContrast?: boolean;
+    notes?: string;
+  }
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/public`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create requisition');
+  }
+  return res.json();
+}
+
 export async function getClinics(token: string) {
   const res = await fetch(`${getApiBase()}/api/meta/clinics`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (!res.ok) throw new Error('Failed to load clinics');
+  const json = (await res.json()) as { clinics: { id: number; name: string }[] };
+  return json.clinics;
+}
+
+export async function getPublicClinics() {
+  const res = await fetch(`${getApiBase()}/api/meta/public/clinics`);
   if (!res.ok) throw new Error('Failed to load clinics');
   const json = (await res.json()) as { clinics: { id: number; name: string }[] };
   return json.clinics;
@@ -165,6 +211,13 @@ export async function getSites(token: string) {
   const res = await fetch(`${getApiBase()}/api/meta/sites`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (!res.ok) throw new Error('Failed to load sites');
+  const json = (await res.json()) as { sites: { id: number; name: string }[] };
+  return json.sites;
+}
+
+export async function getPublicSites() {
+  const res = await fetch(`${getApiBase()}/api/meta/public/sites`);
   if (!res.ok) throw new Error('Failed to load sites');
   const json = (await res.json()) as { sites: { id: number; name: string }[] };
   return json.sites;
