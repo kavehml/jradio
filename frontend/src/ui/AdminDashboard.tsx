@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { createUser, getUsers, updateRadiologistProfile, UserDto } from '../api';
+import {
+  createClinic,
+  createSite,
+  createUser,
+  getClinics,
+  getSites,
+  getUsers,
+  updateRadiologistProfile,
+  UserDto,
+} from '../api';
 
 export const AdminDashboard: React.FC = () => {
   const { token } = useAuth();
@@ -11,6 +20,10 @@ export const AdminDashboard: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [users, setUsers] = useState<UserDto[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [clinics, setClinics] = useState<{ id: number; name: string }[]>([]);
+  const [sites, setSites] = useState<{ id: number; name: string }[]>([]);
+  const [newClinicName, setNewClinicName] = useState('');
+  const [newSiteName, setNewSiteName] = useState('');
 
   const subspecialtyOptions = [
     { id: 'neck', label: 'Neck' },
@@ -36,6 +49,20 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     void loadUsers();
+    const loadMeta = async () => {
+      if (!token) return;
+      try {
+        const [clinicList, siteList] = await Promise.all([getClinics(token), getSites(token)]);
+        setClinics(clinicList);
+        setSites(siteList);
+      } catch (err) {
+        setMessage({
+          type: 'err',
+          text: err instanceof Error ? err.message : 'Failed to load clinics/sites',
+        });
+      }
+    };
+    void loadMeta();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -79,6 +106,30 @@ export const AdminDashboard: React.FC = () => {
         type: 'err',
         text: err instanceof Error ? err.message : 'Failed to update subspecialties',
       });
+    }
+  };
+
+  const handleAddClinic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !newClinicName.trim()) return;
+    try {
+      const created = await createClinic(token, newClinicName.trim());
+      setClinics((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewClinicName('');
+    } catch (err) {
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to add clinic' });
+    }
+  };
+
+  const handleAddSite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !newSiteName.trim()) return;
+    try {
+      const created = await createSite(token, newSiteName.trim());
+      setSites((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewSiteName('');
+    } catch (err) {
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to add site' });
     }
   };
 
@@ -130,6 +181,62 @@ export const AdminDashboard: React.FC = () => {
             Add user
           </button>
         </form>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gap: '1rem',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          marginBottom: '1.5rem',
+        }}
+      >
+        <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
+          <h3 style={{ marginTop: 0 }}>Clinics</h3>
+          <form onSubmit={handleAddClinic} style={{ display: 'flex', gap: 8, marginBottom: '0.75rem' }}>
+            <input
+              type="text"
+              value={newClinicName}
+              onChange={(e) => setNewClinicName(e.target.value)}
+              placeholder="Add clinic name…"
+              style={{ flex: 1 }}
+            />
+            <button type="submit" style={{ padding: '0.4rem 0.75rem', cursor: 'pointer' }}>
+              Add
+            </button>
+          </form>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 180, overflowY: 'auto', fontSize: '0.9rem' }}>
+            {clinics.map((c) => (
+              <li key={c.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                {c.name}
+              </li>
+            ))}
+            {clinics.length === 0 && <li style={{ color: '#94a3b8' }}>No clinics yet.</li>}
+          </ul>
+        </div>
+        <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
+          <h3 style={{ marginTop: 0 }}>Sites / locations</h3>
+          <form onSubmit={handleAddSite} style={{ display: 'flex', gap: 8, marginBottom: '0.75rem' }}>
+            <input
+              type="text"
+              value={newSiteName}
+              onChange={(e) => setNewSiteName(e.target.value)}
+              placeholder="Add site name…"
+              style={{ flex: 1 }}
+            />
+            <button type="submit" style={{ padding: '0.4rem 0.75rem', cursor: 'pointer' }}>
+              Add
+            </button>
+          </form>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 180, overflowY: 'auto', fontSize: '0.9rem' }}>
+            {sites.map((s) => (
+              <li key={s.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                {s.name}
+              </li>
+            ))}
+            {sites.length === 0 && <li style={{ color: '#94a3b8' }}>No sites yet.</li>}
+          </ul>
+        </div>
       </div>
 
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>

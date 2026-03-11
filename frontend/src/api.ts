@@ -135,3 +135,53 @@ export async function createRequisition(
   }
   return res.json();
 }
+
+export async function getClinics(token: string) {
+  const res = await fetch(`${getApiBase()}/api/meta/clinics`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load clinics');
+  const json = (await res.json()) as { clinics: { id: number; name: string }[] };
+  return json.clinics;
+}
+
+export async function createClinic(token: string, name: string) {
+  const res = await fetch(`${getApiBase()}/api/meta/clinics`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create clinic');
+  }
+  return res.json() as Promise<{ id: number; name: string }>;
+}
+
+export async function getSites(token: string) {
+  const res = await fetch(`${getApiBase()}/api/meta/sites`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load sites');
+  const json = (await res.json()) as { sites: { id: number; name: string }[] };
+  return json.sites;
+}
+
+export async function createSite(token: string, name: string) {
+  const res = await fetch(`${getApiBase()}/api/meta/sites`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create site');
+  }
+  return res.json() as Promise<{ id: number; name: string }>;
+}

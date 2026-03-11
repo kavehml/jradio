@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { getImagingCategories, createRequisition } from '../api';
+import { getImagingCategories, createRequisition, getClinics, getSites } from '../api';
 
 interface Category {
   id: number;
@@ -29,12 +29,18 @@ export const ClericalIntake: React.FC = () => {
   const [withContrast, setWithContrast] = useState(false);
   const [protocolText, setProtocolText] = useState('');
   const [notes, setNotes] = useState('');
+  const [clinicOptions, setClinicOptions] = useState<{ id: number; name: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     if (!token) return;
-    getImagingCategories(token)
-      .then(setCategories)
-      .catch(() => setMessage({ type: 'err', text: 'Failed to load imaging categories' }))
+    Promise.all([getImagingCategories(token), getClinics(token), getSites(token)])
+      .then(([cats, clinics, sites]) => {
+        setCategories(cats);
+        setClinicOptions(clinics);
+        setSiteOptions(sites);
+      })
+      .catch(() => setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' }))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -101,20 +107,41 @@ export const ClericalIntake: React.FC = () => {
                   padding: '0.5rem',
                   border: '2px solid ' + (selectedCategory?.id === cat.id ? '#3b82f6' : '#e2e8f0'),
                   borderRadius: 8,
-                  background: selectedCategory?.id === cat.id ? '#eff6ff' : 'white',
+                  background: selectedCategory?.id === cat.id ? '#0f172a' : '#0b1120',
                   cursor: 'pointer',
                   textAlign: 'center',
+                  color: 'white',
                 }}
               >
-                {cat.imagePath && (
-                  <img
-                    src={`/categories/${cat.imagePath}`}
-                    alt=""
-                    style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 4, display: 'block', marginBottom: 4 }}
-                  />
-                )}
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{cat.name}</span>
-                <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>{cat.modality}</span>
+                <div
+                  style={{
+                    width: '100%',
+                    height: 72,
+                    borderRadius: 6,
+                    marginBottom: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background:
+                      cat.bodyPart === 'head'
+                        ? 'linear-gradient(135deg, #38bdf8, #0ea5e9)'
+                        : cat.bodyPart === 'chest'
+                        ? 'linear-gradient(135deg, #f97316, #ea580c)'
+                        : cat.bodyPart === 'abdomen'
+                        ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                        : cat.bodyPart === 'spine'
+                        ? 'linear-gradient(135deg, #a855f7, #7c3aed)'
+                        : cat.bodyPart === 'vascular'
+                        ? 'linear-gradient(135deg, #ef4444, #b91c1c)'
+                        : 'linear-gradient(135deg, #64748b, #334155)',
+                    fontSize: '1.6rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {cat.modality}
+                </div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{cat.name}</span>
+                <span style={{ display: 'block', fontSize: '0.75rem', opacity: 0.8 }}>{cat.bodyPart}</span>
               </button>
             ))}
           </div>
@@ -159,11 +186,43 @@ export const ClericalIntake: React.FC = () => {
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Clinic</span>
-          <input type="text" value={orderingClinic} onChange={(e) => setOrderingClinic(e.target.value)} required />
+          <select
+            value={orderingClinic}
+            onChange={(e) => setOrderingClinic(e.target.value)}
+            style={{ marginBottom: 4 }}
+          >
+            <option value="">Select saved clinic (optional)</option>
+            {clinicOptions.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={orderingClinic}
+            onChange={(e) => setOrderingClinic(e.target.value)}
+            required
+            placeholder="Or type clinic name…"
+          />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Site / location</span>
-          <input type="text" value={site} onChange={(e) => setSite(e.target.value)} required />
+          <select value={site} onChange={(e) => setSite(e.target.value)} style={{ marginBottom: 4 }}>
+            <option value="">Select saved site (optional)</option>
+            {siteOptions.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={site}
+            onChange={(e) => setSite(e.target.value)}
+            required
+            placeholder="Or type site/location…"
+          />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Date of request</span>

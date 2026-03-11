@@ -9,6 +9,8 @@ import './db/models/ImagingCategory';
 import './db/models/Requisition';
 import './db/models/RequisitionImagingItem';
 import './db/models/Visit';
+import './db/models/Clinic';
+import './db/models/SiteLocation';
 import './db/models/Assignments';
 import './db/models/BacklogThreshold';
 import authRoutes from './routes/authRoutes';
@@ -16,6 +18,7 @@ import backlogRoutes from './routes/backlogRoutes';
 import importExportRoutes from './routes/importExportRoutes';
 import imagingCategoriesRoutes from './routes/imagingCategoriesRoutes';
 import requisitionsRoutes from './routes/requisitionsRoutes';
+import metaRoutes from './routes/metaRoutes';
 import { ensureAdminUser } from './services/authService';
 import { seedImagingCategoriesIfEmpty } from './services/seedImagingCategories';
 
@@ -36,6 +39,7 @@ async function bootstrap() {
   app.use('/api/io', importExportRoutes);
   app.use('/api/imaging-categories', imagingCategoriesRoutes);
   app.use('/api/requisitions', requisitionsRoutes);
+  app.use('/api/meta', metaRoutes);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
