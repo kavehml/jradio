@@ -6,6 +6,8 @@ import {
   getClinics,
   getSites,
   getPublicImagingCategories,
+  getImagingSubCategories,
+  getPublicImagingSubCategories,
   getPublicClinics,
   getPublicSites,
 } from '../api';
@@ -40,17 +42,34 @@ export const ClericalIntake: React.FC = () => {
   const [modality, setModality] = useState<string>('');
   const [subCategories, setSubCategories] = useState<string[]>([]);
   const [mriSequences, setMriSequences] = useState<string[]>([]);
+  const [subCategoryMap, setSubCategoryMap] = useState<Record<number, string[]>>({});
 
   useEffect(() => {
     const load = async () => {
       try {
         // Prefer authenticated endpoints when a token is available, otherwise fall back to public ones.
-        const [cats, clinics, sites] = token
-          ? await Promise.all([getImagingCategories(token), getClinics(token), getSites(token)])
-          : await Promise.all([getPublicImagingCategories(), getPublicClinics(), getPublicSites()]);
+        const [cats, clinics, sites, subCategories] = token
+          ? await Promise.all([
+              getImagingCategories(token),
+              getClinics(token),
+              getSites(token),
+              getImagingSubCategories(token),
+            ])
+          : await Promise.all([
+              getPublicImagingCategories(),
+              getPublicClinics(),
+              getPublicSites(),
+              getPublicImagingSubCategories(),
+            ]);
         setCategories(cats);
         setClinicOptions(clinics);
         setSiteOptions(sites);
+        const map: Record<number, string[]> = {};
+        subCategories.forEach((s) => {
+          if (!map[s.categoryId]) map[s.categoryId] = [];
+          map[s.categoryId].push(s.name);
+        });
+        setSubCategoryMap(map);
       } catch {
         setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' });
       } finally {
@@ -333,6 +352,13 @@ export const ClericalIntake: React.FC = () => {
     return [];
   }
 
+  function getMergedSubCategoryOptions(cat: Category | null): string[] {
+    if (!cat) return [];
+    const defaults = getSubCategoryOptions(cat);
+    const dynamic = subCategoryMap[cat.id] || [];
+    return Array.from(new Set([...defaults, ...dynamic]));
+  }
+
   const CT_CATEGORY_ORDER = [
     'MISCELLANEOUS CT',
     'CT ABDO',
@@ -549,7 +575,7 @@ export const ClericalIntake: React.FC = () => {
                         alignItems: 'center',
                       }}
                     >
-                      {getSubCategoryOptions(selectedCategory).map((opt) => {
+                      {getMergedSubCategoryOptions(selectedCategory).map((opt) => {
                         const checked = subCategories.includes(opt);
                         return (
                           <label

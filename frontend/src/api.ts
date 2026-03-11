@@ -111,6 +111,44 @@ export async function getPublicImagingCategories() {
   >;
 }
 
+export interface ImagingSubCategoryDto {
+  id: number;
+  categoryId: number;
+  name: string;
+}
+
+export async function getImagingSubCategories(token: string) {
+  const res = await fetch(`${getApiBase()}/api/imaging-categories/subcategories`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load subcategories');
+  const json = (await res.json()) as { subCategories: ImagingSubCategoryDto[] };
+  return json.subCategories;
+}
+
+export async function getPublicImagingSubCategories() {
+  const res = await fetch(`${getApiBase()}/api/imaging-categories/subcategories/public`);
+  if (!res.ok) throw new Error('Failed to load subcategories');
+  const json = (await res.json()) as { subCategories: ImagingSubCategoryDto[] };
+  return json.subCategories;
+}
+
+export async function createImagingSubCategory(token: string, categoryId: number, name: string) {
+  const res = await fetch(`${getApiBase()}/api/imaging-categories/${categoryId}/subcategories`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create subcategory');
+  }
+  return res.json() as Promise<ImagingSubCategoryDto>;
+}
+
 export async function createRequisition(
   token: string,
   data: {

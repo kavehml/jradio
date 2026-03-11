@@ -6,6 +6,7 @@ import './db/models/User';
 import './db/models/RadiologistProfile';
 import './db/models/ShiftAssignment';
 import './db/models/ImagingCategory';
+import './db/models/ImagingSubCategory';
 import './db/models/Requisition';
 import './db/models/RequisitionImagingItem';
 import './db/models/RequisitionSpecialtyRequirement';

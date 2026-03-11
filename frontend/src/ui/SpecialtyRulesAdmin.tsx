@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { getImagingCategories, getSpecialtyRules, saveSpecialtyRule, SpecialtyRuleDto } from '../api';
+import {
+  createImagingSubCategory,
+  getImagingCategories,
+  getImagingSubCategories,
+  getSpecialtyRules,
+  saveSpecialtyRule,
+  SpecialtyRuleDto,
+} from '../api';
 
 interface Category {
   id: number;
@@ -103,11 +110,13 @@ export const SpecialtyRulesAdmin: React.FC = () => {
   const [rulesMap, setRulesMap] = useState<Record<string, string[]>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [subCategoryMap, setSubCategoryMap] = useState<Record<number, string[]>>({});
+  const [newSubByCategory, setNewSubByCategory] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (!token) return;
-    Promise.all([getImagingCategories(token), getSpecialtyRules(token)])
-      .then(([cats, rules]) => {
+    Promise.all([getImagingCategories(token), getSpecialtyRules(token), getImagingSubCategories(token)])
+      .then(([cats, rules, subCategories]) => {
         setCategories(cats);
         const map: Record<string, string[]> = {};
         rules.forEach((r: SpecialtyRuleDto) => {
@@ -116,6 +125,12 @@ export const SpecialtyRulesAdmin: React.FC = () => {
             : ['general'];
         });
         setRulesMap(map);
+        const subMap: Record<number, string[]> = {};
+        subCategories.forEach((s) => {
+          if (!subMap[s.categoryId]) subMap[s.categoryId] = [];
+          subMap[s.categoryId].push(s.name);
+        });
+        setSubCategoryMap(subMap);
       })
       .catch((e) => setMessage(e instanceof Error ? e.message : 'Failed to load data'));
   }, [token]);
@@ -158,6 +173,23 @@ export const SpecialtyRulesAdmin: React.FC = () => {
     }
   };
 
+  const handleAddSubCategory = async (category: Category) => {
+    if (!token) return;
+    const value = (newSubByCategory[category.id] || '').trim();
+    if (!value) return;
+    try {
+      await createImagingSubCategory(token, category.id, value);
+      setSubCategoryMap((prev) => ({
+        ...prev,
+        [category.id]: Array.from(new Set([...(prev[category.id] || []), value])),
+      }));
+      setNewSubByCategory((prev) => ({ ...prev, [category.id]: '' }));
+      setMessage('Saved.');
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Failed to add subcategory');
+    }
+  };
+
   return (
     <section style={{ maxWidth: 1200, margin: '0 auto' }}>
       <h2>Service to subspecialty mapping</h2>
@@ -171,7 +203,9 @@ export const SpecialtyRulesAdmin: React.FC = () => {
           {cats.map((cat) => {
             const catKey = keyOf(cat.modality, cat.name, null);
             const catSubs = rulesMap[catKey] || ['general'];
-            const subOptions = getSubCategoryOptions(cat);
+            const subOptions = Array.from(
+              new Set([...(getSubCategoryOptions(cat) || []), ...(subCategoryMap[cat.id] || [])])
+            );
             return (
               <details key={cat.id} style={{ marginBottom: '0.75rem' }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{cat.name}</summary>
@@ -194,6 +228,21 @@ export const SpecialtyRulesAdmin: React.FC = () => {
                   <button type="button" onClick={() => void saveRow(cat.modality, cat.name, null)} disabled={savingKey === catKey}>
                     {savingKey === catKey ? 'Saving…' : 'Save category rule'}
                   </button>
+
+                  <div style={{ marginTop: 10, marginBottom: 10, display: 'flex', gap: 8 }}>
+                    <input
+                      type="text"
+                      value={newSubByCategory[cat.id] || ''}
+                      onChange={(e) =>
+                        setNewSubByCategory((prev) => ({ ...prev, [cat.id]: e.target.value }))
+                      }
+                      placeholder="Add subcategory..."
+                      style={{ minWidth: 280 }}
+                    />
+                    <button type="button" onClick={() => void handleAddSubCategory(cat)}>
+                      Add subcategory
+                    </button>
+                  </div>
 
                   {subOptions.length > 0 && (
                     <div style={{ marginTop: 12 }}>

@@ -4,6 +4,7 @@ import {
   createPublicRequisition,
   getPublicClinics,
   getPublicSites,
+  getPublicImagingSubCategories,
 } from '../api';
 
 interface Category {
@@ -35,13 +36,25 @@ export const PublicRequisitionForm: React.FC = () => {
   const [modality, setModality] = useState<string>('');
   const [subCategories, setSubCategories] = useState<string[]>([]);
   const [mriSequences, setMriSequences] = useState<string[]>([]);
+  const [subCategoryMap, setSubCategoryMap] = useState<Record<number, string[]>>({});
 
   useEffect(() => {
-    Promise.all([getPublicImagingCategories(), getPublicClinics(), getPublicSites()])
-      .then(([cats, clinics, sites]) => {
+    Promise.all([
+      getPublicImagingCategories(),
+      getPublicClinics(),
+      getPublicSites(),
+      getPublicImagingSubCategories(),
+    ])
+      .then(([cats, clinics, sites, subCategories]) => {
         setCategories(cats);
         setClinicOptions(clinics);
         setSiteOptions(sites);
+        const map: Record<number, string[]> = {};
+        subCategories.forEach((s) => {
+          if (!map[s.categoryId]) map[s.categoryId] = [];
+          map[s.categoryId].push(s.name);
+        });
+        setSubCategoryMap(map);
       })
       .catch(() => setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' }))
       .finally(() => setLoading(false));
@@ -309,6 +322,13 @@ export const PublicRequisitionForm: React.FC = () => {
     return [];
   }
 
+  function getMergedSubCategoryOptions(cat: Category | null): string[] {
+    if (!cat) return [];
+    const defaults = getSubCategoryOptions(cat);
+    const dynamic = subCategoryMap[cat.id] || [];
+    return Array.from(new Set([...defaults, ...dynamic]));
+  }
+
   const CT_CATEGORY_ORDER = [
     'MISCELLANEOUS CT',
     'CT ABDO',
@@ -525,7 +545,7 @@ export const PublicRequisitionForm: React.FC = () => {
                         alignItems: 'center',
                       }}
                     >
-                      {getSubCategoryOptions(selectedCategory).map((opt) => {
+                      {getMergedSubCategoryOptions(selectedCategory).map((opt) => {
                         const checked = subCategories.includes(opt);
                         return (
                           <label
