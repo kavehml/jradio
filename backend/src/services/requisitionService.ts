@@ -111,16 +111,6 @@ export async function createRequisition(params: {
     );
   }
 
-  if (!requiredSubspecialties.length) {
-    const categoryRule = await SpecialtyRule.findOne({
-      where: {
-        modality: params.modality,
-        categoryName,
-        subCategory: null,
-      },
-    });
-    requiredSubspecialties = categoryRule?.requiredSubspecialties || [];
-  }
   if (!requiredSubspecialties.length) requiredSubspecialties = ['general'];
 
   await RequisitionSpecialtyRequirement.create({

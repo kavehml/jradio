@@ -23,8 +23,15 @@ router.put('/', requireAuth, requireRole(['admin']), async (req, res) => {
     subCategory?: string | null;
     requiredSubspecialties?: string[];
   };
-  if (!body.modality || !body.categoryName || !Array.isArray(body.requiredSubspecialties)) {
-    return res.status(400).json({ error: 'modality, categoryName, requiredSubspecialties are required' });
+  if (
+    !body.modality ||
+    !body.categoryName ||
+    !body.subCategory ||
+    !Array.isArray(body.requiredSubspecialties)
+  ) {
+    return res
+      .status(400)
+      .json({ error: 'modality, categoryName, subCategory, requiredSubspecialties are required' });
   }
   const required = body.requiredSubspecialties.length ? body.requiredSubspecialties : ['general'];
   try {
@@ -32,7 +39,7 @@ router.put('/', requireAuth, requireRole(['admin']), async (req, res) => {
       where: {
         modality: body.modality,
         categoryName: body.categoryName,
-        subCategory: body.subCategory ?? null,
+        subCategory: body.subCategory,
       },
     });
     if (existing) {
@@ -43,7 +50,7 @@ router.put('/', requireAuth, requireRole(['admin']), async (req, res) => {
     const created = await SpecialtyRule.create({
       modality: body.modality,
       categoryName: body.categoryName,
-      subCategory: body.subCategory ?? null,
+      subCategory: body.subCategory,
       requiredSubspecialties: required,
     });
     return res.status(201).json(created);

@@ -201,8 +201,6 @@ export const SpecialtyRulesAdmin: React.FC = () => {
         <div key={modality} style={{ background: 'white', padding: '1rem', borderRadius: 8, marginBottom: '1rem' }}>
           <h3 style={{ marginTop: 0 }}>{modality}</h3>
           {cats.map((cat) => {
-            const catKey = keyOf(cat.modality, cat.name, null);
-            const catSubs = rulesMap[catKey] || ['general'];
             const subOptions = Array.from(
               new Set([...(getSubCategoryOptions(cat) || []), ...(subCategoryMap[cat.id] || [])])
             );
@@ -210,25 +208,6 @@ export const SpecialtyRulesAdmin: React.FC = () => {
               <details key={cat.id} style={{ marginBottom: '0.75rem' }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{cat.name}</summary>
                 <div style={{ padding: '0.5rem 0 0.75rem' }}>
-                  <div style={{ marginBottom: 8 }}>
-                    <strong>Category rule:</strong>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                    {SPECIALTIES.map((s) => (
-                      <label key={s.id} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={catSubs.includes(s.id)}
-                          onChange={() => toggle(cat.modality, cat.name, null, s.id)}
-                        />
-                        <span>{s.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <button type="button" onClick={() => void saveRow(cat.modality, cat.name, null)} disabled={savingKey === catKey}>
-                    {savingKey === catKey ? 'Saving…' : 'Save category rule'}
-                  </button>
-
                   <div style={{ marginTop: 10, marginBottom: 10, display: 'flex', gap: 8 }}>
                     <input
                       type="text"
@@ -246,7 +225,7 @@ export const SpecialtyRulesAdmin: React.FC = () => {
 
                   {subOptions.length > 0 && (
                     <div style={{ marginTop: 12 }}>
-                      <strong>Subcategories</strong>
+                      <strong>Subcategories (rules apply only here)</strong>
                       {subOptions.map((sub) => {
                         const subKey = keyOf(cat.modality, cat.name, sub);
                         const subSubs = rulesMap[subKey] || ['general'];
