@@ -27,6 +27,7 @@ export const ClericalIntake: React.FC = () => {
   const [timeDelayPreset, setTimeDelayPreset] = useState('');
   const [hasImagingWithin24h, setHasImagingWithin24h] = useState(false);
   const [withContrast, setWithContrast] = useState(false);
+  const [protocolText, setProtocolText] = useState('');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export const ClericalIntake: React.FC = () => {
         modality: selectedCategory.modality,
         bodyParts: [selectedCategory.bodyPart],
         withContrast,
-        notes: notes || undefined,
+        notes: protocolText ? `${protocolText}${notes ? ' — ' + notes : ''}` : notes || undefined,
       });
       setMessage({ type: 'ok', text: `Requisition created. Visit #${(result as { visitNumber?: string }).visitNumber}.` });
       setPatientId('');
@@ -68,6 +69,7 @@ export const ClericalIntake: React.FC = () => {
       setSite('');
       setDateOfRequest('');
       setTimeDelayPreset('');
+      setProtocolText('');
       setNotes('');
       setSelectedCategory(null);
     } catch (err) {
@@ -184,6 +186,15 @@ export const ClericalIntake: React.FC = () => {
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input type="checkbox" checked={withContrast} onChange={(e) => setWithContrast(e.target.checked)} />
           <span>With contrast</span>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span>Protocol text from booking screen (optional)</span>
+          <textarea
+            value={protocolText}
+            onChange={(e) => setProtocolText(e.target.value)}
+            rows={3}
+            placeholder="e.g. CT EXTREMITIES – CT Knee C+ [15m] 8276K..."
+          />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Additional notes</span>
