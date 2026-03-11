@@ -26,7 +26,6 @@ export const ClericalIntake: React.FC = () => {
   const [dateOfRequest, setDateOfRequest] = useState('');
   const [timeDelayPreset, setTimeDelayPreset] = useState('');
   const [hasImagingWithin24h, setHasImagingWithin24h] = useState(false);
-  const [withContrast, setWithContrast] = useState(false);
   const [notes, setNotes] = useState('');
   const [clinicOptions, setClinicOptions] = useState<{ id: number; name: string }[]>([]);
   const [siteOptions, setSiteOptions] = useState<{ id: number; name: string }[]>([]);
@@ -253,7 +252,7 @@ export const ClericalIntake: React.FC = () => {
         categoryId: selectedCategory.id,
         modality,
         bodyParts: [selectedCategory.bodyPart],
-        withContrast,
+        withContrast: false,
         notes:
           (subCategories.length || mriTechnique
             ? [
@@ -360,24 +359,31 @@ export const ClericalIntake: React.FC = () => {
               </div>
               {selectedCategory && (
                 <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <span>Exam type within this category</span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                        gap: '0.35rem 1.5rem',
+                        columnGap: '1.5rem',
+                        rowGap: '0.35rem',
+                        alignItems: 'center',
+                      }}
+                    >
                       {getSubCategoryOptions(selectedCategory).map((opt) => {
                         const checked = subCategories.includes(opt);
                         return (
                           <label
                             key={opt}
                             style={{
-                              display: 'inline-flex',
+                              display: 'flex',
                               alignItems: 'center',
-                              gap: 4,
-                              padding: '2px 6px',
-                              borderRadius: 999,
-                              border: checked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-                              background: checked ? '#eff6ff' : '#f8fafc',
-                              fontSize: '0.8rem',
+                              gap: 8,
+                              padding: '0.35rem 0',
                               cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              borderBottom: '1px solid #f1f5f9',
                             }}
                           >
                             <input
@@ -388,7 +394,7 @@ export const ClericalIntake: React.FC = () => {
                                   checked ? prev.filter((s) => s !== opt) : [...prev, opt]
                                 )
                               }
-                              style={{ margin: 0 }}
+                              style={{ margin: 0, flexShrink: 0 }}
                             />
                             <span>{opt}</span>
                           </label>
@@ -396,16 +402,6 @@ export const ClericalIntake: React.FC = () => {
                       })}
                     </div>
                   </label>
-                  {modality === 'CT' || modality === 'Angio' ? (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={withContrast}
-                        onChange={(e) => setWithContrast(e.target.checked)}
-                      />
-                      <span>With contrast</span>
-                    </label>
-                  ) : null}
                   {modality === 'MRI' && (
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span>MRI technique (optional)</span>
@@ -519,10 +515,6 @@ export const ClericalIntake: React.FC = () => {
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input type="checkbox" checked={hasImagingWithin24h} onChange={(e) => setHasImagingWithin24h(e.target.checked)} />
           <span>Patient has relevant imaging within last 24 hours</span>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="checkbox" checked={withContrast} onChange={(e) => setWithContrast(e.target.checked)} />
-          <span>With contrast</span>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Additional notes</span>
