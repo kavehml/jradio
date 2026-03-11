@@ -170,6 +170,27 @@ export const RequisitionsAdmin: React.FC = () => {
     }
   };
 
+  const getCategoryOptions = (rowId: number) => {
+    const currentModality = localImaging[rowId]?.modality || '';
+    const opts = categories.filter((c) => c.modality === currentModality);
+    const currentCatId = localImaging[rowId]?.categoryId;
+    const currentCat =
+      rows.find((r) => r.id === rowId)?.imagingItems?.[0]?.category ||
+      categories.find((c) => c.id === currentCatId);
+    if (currentCat && !opts.some((o) => o.id === currentCat.id)) {
+      return [currentCat as Category, ...opts];
+    }
+    return opts;
+  };
+
+  const getSubCategoryOptionsForRow = (rowId: number) => {
+    const categoryId = localImaging[rowId]?.categoryId;
+    if (!categoryId) return localImaging[rowId]?.selectedSubCategories || [];
+    const dynamic = subCategoryMap[categoryId] || [];
+    const selected = localImaging[rowId]?.selectedSubCategories || [];
+    return Array.from(new Set([...dynamic, ...selected]));
+  };
+
   return (
     <section style={{ maxWidth: 1120, margin: '0 auto' }}>
       <h3 style={{ marginTop: 0 }}>All requisitions</h3>
@@ -255,13 +276,11 @@ export const RequisitionsAdmin: React.FC = () => {
                         }
                       >
                         <option value="">Select...</option>
-                        {categories
-                          .filter((c) => c.modality === (localImaging[r.id]?.modality || ''))
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
+                        {getCategoryOptions(r.id).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
                       </select>
                     ) : (
                       r.imagingItems?.[0]?.category?.name || '—'
@@ -281,9 +300,7 @@ export const RequisitionsAdmin: React.FC = () => {
                           }));
                         }}
                       >
-                        {((localImaging[r.id]?.categoryId &&
-                          subCategoryMap[localImaging[r.id].categoryId!]) ||
-                          []).map((s) => (
+                        {getSubCategoryOptionsForRow(r.id).map((s) => (
                           <option key={s} value={s}>
                             {s}
                           </option>
