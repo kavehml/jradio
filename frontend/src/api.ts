@@ -223,6 +223,27 @@ export async function getPublicSites() {
   return json.sites;
 }
 
+export interface RequisitionSummary {
+  id: number;
+  patientIdOrTempLabel: string;
+  orderingDoctorName: string;
+  orderingClinic: string;
+  site: string;
+  status: string;
+  calculatedDueDate: string | null;
+  createdAt: string;
+  visit?: { visitNumber: string | null } | null;
+}
+
+export async function getRequisitions(token: string) {
+  const res = await fetch(`${getApiBase()}/api/requisitions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load requisitions');
+  const json = (await res.json()) as { requisitions: RequisitionSummary[] };
+  return json.requisitions;
+}
+
 export async function createSite(token: string, name: string) {
   const res = await fetch(`${getApiBase()}/api/meta/sites`, {
     method: 'POST',

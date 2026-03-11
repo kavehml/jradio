@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { createRequisition } from '../services/requisitionService';
+import { Requisition } from '../db/models/Requisition';
+import { Visit } from '../db/models/Visit';
 
 const router = Router();
 
@@ -114,6 +116,36 @@ router.post('/public', async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to create requisition' });
+  }
+});
+
+// List requisitions for admins/clerical
+router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, res) => {
+  try {
+    const requisitions = await Requisition.findAll({
+      order: [['id', 'DESC']],
+      include: [
+        {
+          model: Visit,
+          as: 'visit',
+          attributes: ['visitNumber'],
+        },
+      ],
+      attributes: [
+        'id',
+        'patientIdOrTempLabel',
+        'orderingDoctorName',
+        'orderingClinic',
+        'site',
+        'status',
+        'calculatedDueDate',
+        'createdAt',
+      ],
+    });
+    return res.json({ requisitions });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load requisitions' });
   }
 });
 

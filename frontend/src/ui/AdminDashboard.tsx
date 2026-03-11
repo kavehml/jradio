@@ -10,6 +10,7 @@ import {
   updateRadiologistProfile,
   UserDto,
 } from '../api';
+import { RequisitionsAdmin } from './RequisitionsAdmin';
 
 export const AdminDashboard: React.FC = () => {
   const { token } = useAuth();
@@ -302,6 +303,18 @@ export const AdminDashboard: React.FC = () => {
             </table>
           </div>
         )}
+      </div>
+
+      <div
+        style={{
+          background: 'white',
+          padding: '1.5rem',
+          borderRadius: 8,
+          boxShadow: '0 1px 3px rgba(15,23,42,0.1)',
+          marginTop: '1.5rem',
+        }}
+      >
+        <RequisitionsAdmin />
       </div>
     </section>
   );
