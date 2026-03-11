@@ -32,6 +32,7 @@ export const ClericalIntake: React.FC = () => {
   const [siteOptions, setSiteOptions] = useState<{ id: number; name: string }[]>([]);
   const [modality, setModality] = useState<string>('');
   const [subCategory, setSubCategory] = useState<string>('');
+  const [mriTechnique, setMriTechnique] = useState<string>('');
 
   useEffect(() => {
     if (!token) return;
@@ -213,10 +214,22 @@ export const ClericalIntake: React.FC = () => {
     if (cat.modality === 'MRI') {
       const n = name;
       if (n.includes('BRAIN')) {
-        return ['MRI Brain without contrast', 'MRI Brain with contrast', 'MRI Brain with/without contrast'];
+        return ['MRI Brain w/o contrast', 'MRI Brain w & w/o contrast', 'MRI Brain w contrast'];
       }
       if (n.includes('SPINE')) {
         return ['MRI Cervical Spine', 'MRI Thoracic Spine', 'MRI Lumbar Spine', 'MRI Whole Spine'];
+      }
+      if (n.includes('ABDO') || n.includes('ABDomen') || n.includes('PELVIS')) {
+        return ['MRI Abdomen', 'MRI Pelvis', 'MRI Abdomen + Pelvis'];
+      }
+      if (n.includes('CHEST')) {
+        return ['MRI Chest', 'MRI Cardiac'];
+      }
+      if (n.includes('EXTREM')) {
+        return ['MRI Upper Extremity', 'MRI Lower Extremity'];
+      }
+      if (n.includes('MISC')) {
+        return ['MRI Other'];
       }
       return [];
     }
@@ -255,7 +268,10 @@ export const ClericalIntake: React.FC = () => {
         modality,
         bodyParts: [selectedCategory.bodyPart],
         withContrast,
-        notes: subCategory ? `${subCategory}${notes ? ' — ' + notes : ''}` : notes || undefined,
+        notes:
+          (subCategory || mriTechnique
+            ? [subCategory, modality === 'MRI' ? mriTechnique : ''].filter(Boolean).join(' · ')
+            : undefined) || notes || undefined,
       });
       setMessage({ type: 'ok', text: `Requisition created. Visit #${(result as { visitNumber?: string }).visitNumber}.` });
       setPatientId('');
@@ -266,6 +282,7 @@ export const ClericalIntake: React.FC = () => {
       setTimeDelayPreset('');
       setModality('');
       setSubCategory('');
+      setMriTechnique('');
       setNotes('');
       setSelectedCategory(null);
     } catch (err) {
@@ -349,7 +366,7 @@ export const ClericalIntake: React.FC = () => {
                 )}
               </div>
               {selectedCategory && (
-                <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span>Exam type within this category</span>
                     <select value={subCategory} onChange={(e) => setSubCategory(e.target.value)}>
@@ -361,6 +378,29 @@ export const ClericalIntake: React.FC = () => {
                       ))}
                     </select>
                   </label>
+                  {modality === 'CT' || modality === 'Angio' ? (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={withContrast}
+                        onChange={(e) => setWithContrast(e.target.checked)}
+                      />
+                      <span>With contrast</span>
+                    </label>
+                  ) : null}
+                  {modality === 'MRI' && (
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span>MRI technique (optional)</span>
+                      <select value={mriTechnique} onChange={(e) => setMriTechnique(e.target.value)}>
+                        <option value="">Select technique</option>
+                        <option value="T1">T1</option>
+                        <option value="T2">T2</option>
+                        <option value="FLAIR">FLAIR</option>
+                        <option value="DWI">DWI</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
               )}
             </>
