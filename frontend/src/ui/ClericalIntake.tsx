@@ -210,13 +210,28 @@ export const ClericalIntake: React.FC = () => {
           return [];
       }
     }
-    // Other modalities not yet enumerated
+    if (cat.modality === 'MRI') {
+      const n = name;
+      if (n.includes('BRAIN')) {
+        return ['MRI Brain without contrast', 'MRI Brain with contrast', 'MRI Brain with/without contrast'];
+      }
+      if (n.includes('SPINE')) {
+        return ['MRI Cervical Spine', 'MRI Thoracic Spine', 'MRI Lumbar Spine', 'MRI Whole Spine'];
+      }
+      return [];
+    }
+    if (cat.modality === 'US') {
+      return ['US Abdomen', 'US Abdomen + Pelvis', 'US Pelvis', 'US Abdominal Doppler'];
+    }
+    if (cat.modality === 'Angio') {
+      return ['CT Angiography – Aorta', 'CT Angiography – Carotids', 'CT Angiography – Peripheral'];
+    }
     return [];
   }
 
   const filteredCategories = modality
     ? categories.filter((c) => c.modality.toLowerCase() === modality.toLowerCase())
-    : categories;
+    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,55 +310,61 @@ export const ClericalIntake: React.FC = () => {
               </button>
             ))}
           </div>
-          <h3 style={{ marginBottom: '0.5rem' }}>Imaging category</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            {filteredCategories.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
+          {modality && (
+            <>
+              <h3 style={{ marginBottom: '0.5rem' }}>Imaging category</h3>
+              <div
                 style={{
-                  padding: '0.5rem',
-                  border: '2px solid ' + (selectedCategory?.id === cat.id ? '#3b82f6' : '#e2e8f0'),
-                  borderRadius: 8,
-                  background: selectedCategory?.id === cat.id ? '#0f172a' : '#0b1120',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  color: 'white',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gap: '0.75rem',
+                  marginBottom: '1.5rem',
                 }}
               >
-                <div
-                  style={{
-                    width: '100%',
-                    height: 72,
-                    borderRadius: 6,
-                    marginBottom: 6,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background:
-                      cat.bodyPart === 'head'
-                        ? 'linear-gradient(135deg, #38bdf8, #0ea5e9)'
-                        : cat.bodyPart === 'chest'
-                        ? 'linear-gradient(135deg, #f97316, #ea580c)'
-                        : cat.bodyPart === 'abdomen'
-                        ? 'linear-gradient(135deg, #22c55e, #16a34a)'
-                        : cat.bodyPart === 'spine'
-                        ? 'linear-gradient(135deg, #a855f7, #7c3aed)'
-                        : cat.bodyPart === 'vascular'
-                        ? 'linear-gradient(135deg, #ef4444, #b91c1c)'
-                        : 'linear-gradient(135deg, #64748b, #334155)',
-                    fontSize: '1.6rem',
-                    fontWeight: 700,
-                  }}
-                >
-                  {cat.modality}
+                {filteredCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(cat);
+                      setSubCategory('');
+                    }}
+                    style={{
+                      padding: '0.75rem 0.5rem',
+                      border: '2px solid ' + (selectedCategory?.id === cat.id ? '#3b82f6' : '#e2e8f0'),
+                      borderRadius: 8,
+                      background: selectedCategory?.id === cat.id ? '#eff6ff' : 'white',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{cat.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      {cat.modality} · {cat.bodyPart}
+                    </div>
+                  </button>
+                ))}
+                {filteredCategories.length === 0 && (
+                  <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>No categories configured for this modality yet.</div>
+                )}
+              </div>
+              {selectedCategory && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span>Exam type within this category</span>
+                    <select value={subCategory} onChange={(e) => setSubCategory(e.target.value)}>
+                      <option value="">Select exam type (optional)</option>
+                      {getSubCategoryOptions(selectedCategory).map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{cat.name}</span>
-                <span style={{ display: 'block', fontSize: '0.75rem', opacity: 0.8 }}>{cat.bodyPart}</span>
-              </button>
-            ))}
-          </div>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -445,19 +466,6 @@ export const ClericalIntake: React.FC = () => {
           <input type="checkbox" checked={withContrast} onChange={(e) => setWithContrast(e.target.checked)} />
           <span>With contrast</span>
         </label>
-        {selectedCategory && (
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Exam type within this category</span>
-            <select value={subCategory} onChange={(e) => setSubCategory(e.target.value)}>
-              <option value="">Select exam type (optional)</option>
-              {getSubCategoryOptions(selectedCategory).map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Additional notes</span>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
