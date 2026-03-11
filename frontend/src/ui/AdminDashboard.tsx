@@ -27,12 +27,31 @@ export const AdminDashboard: React.FC = () => {
 
   const subspecialtyOptions = [
     { id: 'general', label: 'General' },
-    { id: 'neck', label: 'Neck' },
-    { id: 'angio', label: 'Angio' },
-    { id: 'interventional', label: 'Interventional' },
-    { id: 'virtual_colonoscopy', label: 'Virtual colonoscopy' },
-    { id: 'coronary', label: 'Coronary' },
+    { id: 'neuroradiology', label: 'Neuroradiology' },
+    { id: 'musculoskeletal_radiology', label: 'Musculoskeletal Radiology' },
+    { id: 'body_imaging_abdominal_radiology', label: 'Body Imaging / Abdominal Radiology' },
+    { id: 'breast_imaging', label: 'Breast Imaging' },
+    { id: 'cardiothoracic_radiology', label: 'Cardiothoracic Radiology' },
+    { id: 'pediatric_radiology', label: 'Pediatric Radiology' },
+    { id: 'interventional_radiology', label: 'Interventional Radiology' },
+    { id: 'nuclear_medicine', label: 'Nuclear Medicine' },
+    { id: 'emergency_radiology', label: 'Emergency Radiology' },
+    { id: 'genitourinary_radiology', label: 'Genitourinary Radiology' },
+    { id: 'gastrointestinal_radiology', label: 'Gastrointestinal Radiology' },
+    { id: 'vascular_radiology', label: 'Vascular Radiology' },
   ] as const;
+
+  const normalizeSubspecialties = (subs: string[]) => {
+    const mapping: Record<string, string> = {
+      general_body: 'general',
+      neck: 'neuroradiology',
+      angio: 'vascular_radiology',
+      interventional: 'interventional_radiology',
+      virtual_colonoscopy: 'gastrointestinal_radiology',
+      coronary: 'cardiothoracic_radiology',
+    };
+    return Array.from(new Set(subs.map((s) => mapping[s] ?? s)));
+  };
 
   const loadUsers = async () => {
     if (!token) return;
@@ -86,9 +105,7 @@ export const AdminDashboard: React.FC = () => {
     if (!token) return;
     if (user.role !== 'radiologist') return;
     const current = user.radiologistProfile?.subspecialties ?? [];
-    const normalizedCurrent = current.includes('general_body')
-      ? Array.from(new Set([...current.filter((s) => s !== 'general_body'), 'general']))
-      : current;
+    const normalizedCurrent = normalizeSubspecialties(current);
     const exists = normalizedCurrent.includes(subspecialtyId);
     const next = exists
       ? normalizedCurrent.filter((s) => s !== subspecialtyId)
@@ -273,11 +290,8 @@ export const AdminDashboard: React.FC = () => {
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                           {subspecialtyOptions.map((opt) => {
-                            const subs = u.radiologistProfile?.subspecialties ?? [];
-                            const checked =
-                              opt.id === 'general'
-                                ? subs.includes('general') || subs.includes('general_body')
-                                : subs.includes(opt.id);
+                            const subs = normalizeSubspecialties(u.radiologistProfile?.subspecialties ?? []);
+                            const checked = subs.includes(opt.id);
                             return (
                               <label
                                 key={opt.id}
