@@ -307,4 +307,35 @@ router.patch('/:id/rvu', requireAuth, requireRole(['admin', 'radiologist']), asy
   }
 });
 
+// Update additional notes for requisition imaging item
+router.patch('/:id/notes', requireAuth, requireRole(['admin', 'radiologist', 'clerical']), async (req, res) => {
+  const id = Number(req.params.id);
+  const { notes } = req.body as { notes?: string };
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid requisition id' });
+  try {
+    const item = await RequisitionImagingItem.findOne({ where: { requisitionId: id } });
+    if (!item) return res.status(404).json({ error: 'Imaging item not found for requisition' });
+    item.specialNotes = notes?.trim() ? notes.trim() : null;
+    await item.save();
+    return res.json({ requisitionId: id, notes: item.specialNotes });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update notes' });
+  }
+});
+
+// Delete requisition
+router.delete('/:id', requireAuth, requireRole(['admin', 'clerical']), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid requisition id' });
+  try {
+    const deleted = await Requisition.destroy({ where: { id } });
+    if (!deleted) return res.status(404).json({ error: 'Requisition not found' });
+    return res.json({ deleted: 1 });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to delete requisition' });
+  }
+});
+
 export default router;

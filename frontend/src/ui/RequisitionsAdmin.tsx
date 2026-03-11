@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
   approveRequisition,
+  deleteRequisition,
   getImagingCategories,
   getImagingSubCategories,
   getRequisitions,
   RequisitionSummary,
   updateRequisitionImaging,
+  updateRequisitionNotes,
   updateRequisitionRvu,
   updateRequisitionSchedule,
 } from '../api';
@@ -56,6 +58,7 @@ export const RequisitionsAdmin: React.FC = () => {
   const [localImaging, setLocalImaging] = useState<
     Record<number, { modality: string; categoryId: number | null; selectedSubCategories: string[] }>
   >({});
+  const [localNotes, setLocalNotes] = useState<Record<number, string>>({});
 
   const resolveCategoryModality = (modality: string) => {
     if (modality === 'PET' || modality === 'X-ray') return 'Other';
@@ -64,9 +67,20 @@ export const RequisitionsAdmin: React.FC = () => {
 
   const getRowImaging = (r: RequisitionSummary) => {
     const item = r.imagingItems?.[0];
+    const inferredCategory =
+      item?.categoryId != null ? categories.find((c) => c.id === item.categoryId) : undefined;
+    const inferredModality = inferredCategory
+      ? inferredCategory.modality === 'Other'
+        ? inferredCategory.name.toUpperCase().startsWith('PET ')
+          ? 'PET'
+          : inferredCategory.name.toUpperCase().startsWith('XR ')
+          ? 'X-ray'
+          : 'Other'
+        : inferredCategory.modality
+      : '';
     return (
       localImaging[r.id] || {
-        modality: modalityForUi(item),
+        modality: modalityForUi(item) || inferredModality,
         categoryId: item?.categoryId ?? null,
         selectedSubCategories:
           item?.selectedSubCategories?.length
@@ -111,6 +125,7 @@ export const RequisitionsAdmin: React.FC = () => {
       number,
       { modality: string; categoryId: number | null; selectedSubCategories: string[] }
     > = {};
+    const notesMap: Record<number, string> = {};
     rows.forEach((r) => {
       const item = r.imagingItems?.[0];
       const due = r.calculatedDueDate
@@ -131,9 +146,11 @@ export const RequisitionsAdmin: React.FC = () => {
             ? item.selectedSubCategories
             : parseSubCategoriesFromNotes(item?.specialNotes),
       };
+      notesMap[r.id] = item?.specialNotes || '';
     });
     setLocalRows(map);
     setLocalImaging(imagingMap);
+    setLocalNotes((prev) => ({ ...prev, ...notesMap }));
   }, [rows]);
 
   const handleApprove = async (id: number) => {
@@ -216,6 +233,33 @@ export const RequisitionsAdmin: React.FC = () => {
     }
   };
 
+  const handleUpdateNotes = async (id: number) => {
+    if (!token) return;
+    setSavingId(id);
+    try {
+      await updateRequisitionNotes(token, id, localNotes[id] || '');
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update notes');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!token) return;
+    if (!window.confirm('Delete this requisition?')) return;
+    setSavingId(id);
+    try {
+      await deleteRequisition(token, id);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete requisition');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const getCategoryOptions = (rowId: number) => {
     const row = rows.find((r) => r.id === rowId);
     const current = row ? getRowImaging(row) : undefined;
@@ -263,6 +307,7 @@ export const RequisitionsAdmin: React.FC = () => {
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Subcategories</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Required specialty</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Additional notes</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>RVU</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Created</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Due date</th>
@@ -373,6 +418,16 @@ export const RequisitionsAdmin: React.FC = () => {
                     {(r.specialtyRequirement?.requiredSubspecialties || ['general']).join(', ')}
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <textarea
+                      value={localNotes[r.id] ?? r.imagingItems?.[0]?.specialNotes ?? ''}
+                      onChange={(e) =>
+                        setLocalNotes((prev) => ({ ...prev, [r.id]: e.target.value }))
+                      }
+                      rows={2}
+                      style={{ minWidth: 220 }}
+                    />
+                  </td>
+                  <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     <input
                       type="number"
                       min={1}
@@ -438,6 +493,14 @@ export const RequisitionsAdmin: React.FC = () => {
                           {savingId === r.id ? 'Saving…' : 'Save imaging'}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        disabled={savingId === r.id}
+                        onClick={() => void handleUpdateNotes(r.id)}
+                        style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
+                      >
+                        {savingId === r.id ? 'Saving…' : 'Save notes'}
+                      </button>
                       {r.status === 'pending_approval' && (
                         <button
                           type="button"
@@ -448,13 +511,21 @@ export const RequisitionsAdmin: React.FC = () => {
                           {savingId === r.id ? 'Saving…' : 'Approve'}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        disabled={savingId === r.id}
+                        onClick={() => void handleDelete(r.id)}
+                        style={{ padding: '0.25rem 0.75rem', cursor: 'pointer', color: '#b91c1c' }}
+                      >
+                        {savingId === r.id ? 'Saving…' : 'Delete'}
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={15} style={{ padding: '0.75rem', color: '#94a3b8' }}>
+                  <td colSpan={16} style={{ padding: '0.75rem', color: '#94a3b8' }}>
                     No requisitions yet.
                   </td>
                 </tr>

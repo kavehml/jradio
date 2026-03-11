@@ -351,6 +351,34 @@ export async function updateRequisitionImaging(
   }>;
 }
 
+export async function updateRequisitionNotes(token: string, id: number, notes: string) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/${id}/notes`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ notes }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update notes');
+  }
+  return res.json() as Promise<{ requisitionId: number; notes: string | null }>;
+}
+
+export async function deleteRequisition(token: string, id: number) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to delete requisition');
+  }
+  return res.json() as Promise<{ deleted: number }>;
+}
+
 export interface ShiftDto {
   id: number;
   date: string;
