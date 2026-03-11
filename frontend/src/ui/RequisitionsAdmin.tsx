@@ -98,7 +98,7 @@ export const RequisitionsAdmin: React.FC = () => {
   };
 
   return (
-    <section style={{ marginTop: '1.5rem' }}>
+    <section style={{ maxWidth: 1120, margin: '0 auto' }}>
       <h3 style={{ marginTop: 0 }}>All requisitions</h3>
       {loading && <p>Loading requisitions…</p>}
       {error && <p style={{ color: '#b91c1c' }}>{error}</p>}

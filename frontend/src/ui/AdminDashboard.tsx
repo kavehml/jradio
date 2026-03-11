@@ -10,7 +10,6 @@ import {
   updateRadiologistProfile,
   UserDto,
 } from '../api';
-import { RequisitionsAdmin } from './RequisitionsAdmin';
 
 export const AdminDashboard: React.FC = () => {
   const { token } = useAuth();
@@ -27,12 +26,12 @@ export const AdminDashboard: React.FC = () => {
   const [newSiteName, setNewSiteName] = useState('');
 
   const subspecialtyOptions = [
+    { id: 'general', label: 'General' },
     { id: 'neck', label: 'Neck' },
     { id: 'angio', label: 'Angio' },
     { id: 'interventional', label: 'Interventional' },
     { id: 'virtual_colonoscopy', label: 'Virtual colonoscopy' },
     { id: 'coronary', label: 'Coronary' },
-    { id: 'general_body', label: 'General body' },
   ] as const;
 
   const loadUsers = async () => {
@@ -87,8 +86,13 @@ export const AdminDashboard: React.FC = () => {
     if (!token) return;
     if (user.role !== 'radiologist') return;
     const current = user.radiologistProfile?.subspecialties ?? [];
-    const exists = current.includes(subspecialtyId);
-    const next = exists ? current.filter((s) => s !== subspecialtyId) : [...current, subspecialtyId];
+    const normalizedCurrent = current.includes('general_body')
+      ? Array.from(new Set([...current.filter((s) => s !== 'general_body'), 'general']))
+      : current;
+    const exists = normalizedCurrent.includes(subspecialtyId);
+    const next = exists
+      ? normalizedCurrent.filter((s) => s !== subspecialtyId)
+      : [...normalizedCurrent, subspecialtyId];
     try {
       const updated = await updateRadiologistProfile(token, user.id, {
         subspecialties: next,
@@ -269,7 +273,11 @@ export const AdminDashboard: React.FC = () => {
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                           {subspecialtyOptions.map((opt) => {
-                            const checked = u.radiologistProfile?.subspecialties?.includes(opt.id) ?? false;
+                            const subs = u.radiologistProfile?.subspecialties ?? [];
+                            const checked =
+                              opt.id === 'general'
+                                ? subs.includes('general') || subs.includes('general_body')
+                                : subs.includes(opt.id);
                             return (
                               <label
                                 key={opt.id}
@@ -303,18 +311,6 @@ export const AdminDashboard: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
-
-      <div
-        style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: 8,
-          boxShadow: '0 1px 3px rgba(15,23,42,0.1)',
-          marginTop: '1.5rem',
-        }}
-      >
-        <RequisitionsAdmin />
       </div>
     </section>
   );

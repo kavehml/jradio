@@ -8,6 +8,7 @@ import { RadiologistDashboard } from './ui/RadiologistDashboard';
 import { ClericalIntake } from './ui/ClericalIntake';
 import { AdminDashboard } from './ui/AdminDashboard';
 import { PublicRequisitionForm } from './ui/PublicRequisitionForm';
+import { RequisitionsAdmin } from './ui/RequisitionsAdmin';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
@@ -33,6 +34,7 @@ const Root = () => (
           <Route index element={<Navigate to="/radiologist" replace />} />
           <Route path="radiologist" element={<RadiologistDashboard />} />
           <Route path="clerical" element={<ClericalIntake />} />
+          <Route path="requisitions" element={<RequisitionsAdmin />} />
           <Route path="admin" element={<AdminDashboard />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -15,6 +15,7 @@ export const AppLayout: React.FC = () => {
   const role = user?.role;
   const canSeeAdmin = role === 'admin';
   const canSeeClerical = role === 'admin' || role === 'clerical';
+  const canSeeRequisitions = role === 'admin' || role === 'clerical';
   const canSeeRadiologist = true;
 
   return (
@@ -27,6 +28,9 @@ export const AppLayout: React.FC = () => {
           )}
           {canSeeClerical && (
             <Link to="/clerical" style={{ textDecoration: location.pathname.includes('clerical') ? 'underline' : 'none' }}>Clerical intake</Link>
+          )}
+          {canSeeRequisitions && (
+            <Link to="/requisitions" style={{ textDecoration: location.pathname.includes('requisitions') ? 'underline' : 'none' }}>Requisitions</Link>
           )}
           {canSeeAdmin && (
             <Link to="/admin" style={{ textDecoration: location.pathname.includes('admin') ? 'underline' : 'none' }}>Admin portal</Link>
