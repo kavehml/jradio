@@ -13,8 +13,12 @@ const CT_CATEGORIES: { name: string; bodyPart: string }[] = [
 ];
 
 const OTHER_MODALITY_CATEGORIES: { name: string; modality: 'MRI' | 'Angio' | 'US' | 'Other'; bodyPart: string; isSubspecialtyRestricted: boolean }[] = [
-  { name: 'MRI BRAIN', modality: 'MRI', bodyPart: 'head', isSubspecialtyRestricted: false },
+  { name: 'MRI BRAIN / HEAD', modality: 'MRI', bodyPart: 'head', isSubspecialtyRestricted: false },
   { name: 'MRI SPINE', modality: 'MRI', bodyPart: 'spine', isSubspecialtyRestricted: false },
+  { name: 'MRI ABDOMEN', modality: 'MRI', bodyPart: 'abdomen', isSubspecialtyRestricted: false },
+  { name: 'MRI PELVIS', modality: 'MRI', bodyPart: 'pelvis', isSubspecialtyRestricted: false },
+  { name: 'MRI MUSCULOSKELETAL', modality: 'MRI', bodyPart: 'extremities', isSubspecialtyRestricted: false },
+  { name: 'MRI VASCULAR', modality: 'MRI', bodyPart: 'vascular', isSubspecialtyRestricted: false },
   { name: 'US ABDOMEN', modality: 'US', bodyPart: 'abdomen', isSubspecialtyRestricted: false },
   { name: 'ANGIO', modality: 'Angio', bodyPart: 'vascular', isSubspecialtyRestricted: true },
 ];

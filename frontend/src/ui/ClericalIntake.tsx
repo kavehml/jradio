@@ -31,7 +31,7 @@ export const ClericalIntake: React.FC = () => {
   const [siteOptions, setSiteOptions] = useState<{ id: number; name: string }[]>([]);
   const [modality, setModality] = useState<string>('');
   const [subCategories, setSubCategories] = useState<string[]>([]);
-  const [mriTechnique, setMriTechnique] = useState<string>('');
+  const [mriSequences, setMriSequences] = useState<string[]>([]);
 
   useEffect(() => {
     if (!token) return;
@@ -183,23 +183,33 @@ export const ClericalIntake: React.FC = () => {
     }
     if (cat.modality === 'MRI') {
       const n = name;
-      if (n.includes('HEAD') || n.includes('BRAIN')) {
-        return ['MRI Brain', 'MRI Pituitary', 'MRI IACs'];
+      if (n.includes('BRAIN') || n.includes('HEAD')) {
+        return [
+          'MRI Brain Routine',
+          'MRI Brain With Contrast',
+          'MRI Brain Tumor Protocol',
+          'MRI Stroke Protocol',
+          'MRI Pituitary',
+          'MRI Orbits',
+          'MRI Internal Auditory Canal (IAC)',
+          'MR Angiography Brain',
+          'MR Venography Brain',
+        ];
       }
       if (n.includes('SPINE')) {
-        return ['MRI Cervical Spine', 'MRI Thoracic Spine', 'MRI Lumbar Spine', 'MRI Whole Spine'];
+        return ['MRI Cervical Spine', 'MRI Thoracic Spine', 'MRI Lumbar Spine', 'MRI Whole Spine', 'MRI Spine Tumor / Infection'];
       }
-      if (n.includes('ABDO') || n.includes('PELVIS')) {
-        return ['MRI Abdomen', 'MRI Pelvis', 'MRI Abdomen + Pelvis'];
+      if (n.includes('ABDOMEN')) {
+        return ['MRI Liver', 'MRCP', 'MRI Pancreas', 'MRI Kidneys', 'MRI Adrenal'];
       }
-      if (n.includes('CHEST')) {
-        return ['MRI Chest', 'MRI Cardiac'];
+      if (n.includes('PELVIS')) {
+        return ['MRI Prostate', 'MRI Female Pelvis', 'MRI Rectal Cancer', 'MRI Pelvic Mass'];
       }
-      if (n.includes('EXTREM')) {
-        return ['MRI Upper Extremity', 'MRI Lower Extremity'];
+      if (n.includes('MUSCULOSKELETAL')) {
+        return ['MRI Shoulder', 'MRI Elbow', 'MRI Wrist', 'MRI Hip', 'MRI Knee', 'MRI Ankle', 'MRI Foot'];
       }
-      if (n.includes('MISC')) {
-        return ['MRI Other'];
+      if (n.includes('VASCULAR')) {
+        return ['MRA Brain', 'MRA Neck', 'MRA Aorta', 'MRA Extremities'];
       }
       return [];
     }
@@ -208,6 +218,30 @@ export const ClericalIntake: React.FC = () => {
     }
     if (cat.modality === 'Angio') {
       return ['CT Angiography – Aorta', 'CT Angiography – Carotids', 'CT Angiography – Peripheral'];
+    }
+    return [];
+  }
+
+  function getMriSequenceOptions(cat: Category | null): string[] {
+    if (!cat || cat.modality !== 'MRI') return [];
+    const name = cat.name.toUpperCase();
+    if (name.includes('BRAIN') || name.includes('HEAD')) {
+      return ['T1', 'T1 Post-Contrast', 'T2', 'FLAIR', 'DWI / ADC', 'SWI / GRE', 'Perfusion', 'Spectroscopy'];
+    }
+    if (name.includes('SPINE')) {
+      return ['T1 Sagittal', 'T2 Sagittal', 'T2 Axial', 'STIR', 'T1 Post Contrast'];
+    }
+    if (name.includes('ABDOMEN')) {
+      return ['T1 In-phase / Out-of-phase', 'T2', 'DWI', 'Dynamic Contrast (arterial, portal, delayed)', 'MRCP sequence'];
+    }
+    if (name.includes('PELVIS')) {
+      return ['T1', 'T2 High Resolution', 'DWI', 'Dynamic Contrast'];
+    }
+    if (name.includes('MUSCULOSKELETAL')) {
+      return ['T1', 'T2', 'Proton Density (PD)', 'PD Fat Sat', 'STIR', 'T1 Post Contrast'];
+    }
+    if (name.includes('VASCULAR')) {
+      return ['Time of Flight (TOF)', 'Phase Contrast', 'Contrast MRA'];
     }
     return [];
   }
@@ -223,10 +257,23 @@ export const ClericalIntake: React.FC = () => {
     'CT SPINE',
   ] as const;
 
+  const MRI_CATEGORY_ORDER = [
+    'MRI BRAIN / HEAD',
+    'MRI SPINE',
+    'MRI ABDOMEN',
+    'MRI PELVIS',
+    'MRI MUSCULOSKELETAL',
+    'MRI VASCULAR',
+  ] as const;
+
   const filteredCategories = modality
     ? modality.toUpperCase() === 'CT'
       ? CT_CATEGORY_ORDER.map((name) =>
           categories.find((c) => c.modality.toUpperCase() === 'CT' && c.name === name)
+        ).filter((c): c is Category => c != null)
+      : modality.toUpperCase() === 'MRI'
+      ? MRI_CATEGORY_ORDER.map((name) =>
+          categories.find((c) => c.modality.toUpperCase() === 'MRI' && c.name === name)
         ).filter((c): c is Category => c != null)
       : categories.filter((c) => c.modality.toLowerCase() === modality.toLowerCase())
     : [];
@@ -254,10 +301,10 @@ export const ClericalIntake: React.FC = () => {
         bodyParts: [selectedCategory.bodyPart],
         withContrast: false,
         notes:
-          (subCategories.length || mriTechnique
+          (subCategories.length || (modality === 'MRI' && mriSequences.length)
             ? [
                 subCategories.length ? `Exams: ${subCategories.join(', ')}` : '',
-                modality === 'MRI' && mriTechnique ? `MRI technique: ${mriTechnique}` : '',
+                modality === 'MRI' && mriSequences.length ? `Sequences: ${mriSequences.join(', ')}` : '',
               ]
                 .filter(Boolean)
                 .join(' · ')
@@ -272,7 +319,7 @@ export const ClericalIntake: React.FC = () => {
       setTimeDelayPreset('');
       setModality('');
       setSubCategories([]);
-      setMriTechnique('');
+      setMriSequences([]);
       setNotes('');
       setSelectedCategory(null);
     } catch (err) {
@@ -303,7 +350,7 @@ export const ClericalIntake: React.FC = () => {
                   setModality(m);
                   setSelectedCategory(null);
                   setSubCategories([]);
-                  setMriTechnique('');
+                  setMriSequences([]);
                 }}
                 style={{
                   padding: '0.35rem 0.9rem',
@@ -336,7 +383,7 @@ export const ClericalIntake: React.FC = () => {
                     onClick={() => {
                       setSelectedCategory(cat);
                       setSubCategories([]);
-                      setMriTechnique('');
+                      setMriSequences([]);
                     }}
                     style={{
                       padding: '0.75rem 0.5rem',
@@ -402,17 +449,48 @@ export const ClericalIntake: React.FC = () => {
                       })}
                     </div>
                   </label>
-                  {modality === 'MRI' && (
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span>MRI technique (optional)</span>
-                      <select value={mriTechnique} onChange={(e) => setMriTechnique(e.target.value)}>
-                        <option value="">Select technique</option>
-                        <option value="T1">T1</option>
-                        <option value="T2">T2</option>
-                        <option value="FLAIR">FLAIR</option>
-                        <option value="DWI">DWI</option>
-                        <option value="Other">Other</option>
-                      </select>
+                  {modality === 'MRI' && getMriSequenceOptions(selectedCategory).length > 0 && (
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <span>Typical sequences</span>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                          columnGap: '1.5rem',
+                          rowGap: '0.35rem',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {getMriSequenceOptions(selectedCategory).map((seq) => {
+                          const checked = mriSequences.includes(seq);
+                          return (
+                            <label
+                              key={seq}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '0.35rem 0',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                borderBottom: '1px solid #f1f5f9',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  setMriSequences((prev) =>
+                                    checked ? prev.filter((s) => s !== seq) : [...prev, seq]
+                                  )
+                                }
+                                style={{ margin: 0, flexShrink: 0 }}
+                              />
+                              <span>{seq}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </label>
                   )}
                 </div>
