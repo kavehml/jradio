@@ -17,10 +17,13 @@ function parseTimeDelayPreset(preset: string | undefined): number | null {
 }
 
 function computeRvu(bodyParts: string[], modality: string): number {
+  if (modality.toLowerCase() === 'angio') {
+    return 3;
+  }
   const parts = bodyParts.length;
   if (parts <= 0) return 1;
   if (parts === 1) return 1;
-  return 2; // Multi-part same modality = 2; mixed modality would be 3 but we take one category per requisition here
+  return 2;
 }
 
 export async function createRequisition(params: {

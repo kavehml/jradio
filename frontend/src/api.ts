@@ -233,6 +233,7 @@ export interface RequisitionSummary {
   calculatedDueDate: string | null;
   createdAt: string;
   visit?: { visitNumber: string | null } | null;
+  imagingItems?: { rvuValue: number }[];
 }
 
 export async function getRequisitions(token: string) {
@@ -242,6 +243,34 @@ export async function getRequisitions(token: string) {
   if (!res.ok) throw new Error('Failed to load requisitions');
   const json = (await res.json()) as { requisitions: RequisitionSummary[] };
   return json.requisitions;
+}
+
+export async function approveRequisition(token: string, id: number) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/${id}/approve`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to approve requisition');
+  }
+  return res.json() as Promise<{ id: number; status: string }>;
+}
+
+export async function updateRequisitionRvu(token: string, id: number, rvuValue: number) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/${id}/rvu`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ rvuValue }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update RVU');
+  }
+  return res.json() as Promise<{ requisitionId: number; rvuValue: number }>;
 }
 
 export async function createSite(token: string, name: string) {

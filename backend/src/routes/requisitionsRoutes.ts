@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { createRequisition } from '../services/requisitionService';
 import { Requisition } from '../db/models/Requisition';
 import { Visit } from '../db/models/Visit';
+import { RequisitionImagingItem } from '../db/models/RequisitionImagingItem';
 
 const router = Router();
 
@@ -130,6 +131,11 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
           as: 'visit',
           attributes: ['visitNumber'],
         },
+        {
+          model: RequisitionImagingItem,
+          as: 'imagingItems',
+          attributes: ['rvuValue'],
+        },
       ],
       attributes: [
         'id',
@@ -146,6 +152,41 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load requisitions' });
+  }
+});
+
+// Approve requisition
+router.patch('/:id/approve', requireAuth, requireRole(['admin', 'radiologist']), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid requisition id' });
+  try {
+    const reqn = await Requisition.findByPk(id);
+    if (!reqn) return res.status(404).json({ error: 'Requisition not found' });
+    reqn.status = 'approved';
+    await reqn.save();
+    return res.json({ id: reqn.id, status: reqn.status });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to approve requisition' });
+  }
+});
+
+// Manually update RVU value for a requisition's imaging item
+router.patch('/:id/rvu', requireAuth, requireRole(['admin', 'radiologist']), async (req, res) => {
+  const id = Number(req.params.id);
+  const { rvuValue } = req.body as { rvuValue?: number };
+  if (!Number.isFinite(id) || typeof rvuValue !== 'number' || rvuValue < 1 || rvuValue > 3) {
+    return res.status(400).json({ error: 'rvuValue must be between 1 and 3' });
+  }
+  try {
+    const item = await RequisitionImagingItem.findOne({ where: { requisitionId: id } });
+    if (!item) return res.status(404).json({ error: 'Imaging item not found for requisition' });
+    item.rvuValue = rvuValue;
+    await item.save();
+    return res.json({ requisitionId: id, rvuValue: item.rvuValue });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update RVU' });
   }
 });
 
