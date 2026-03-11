@@ -214,7 +214,79 @@ export const ClericalIntake: React.FC = () => {
       return [];
     }
     if (cat.modality === 'US') {
-      return ['US Abdomen', 'US Abdomen + Pelvis', 'US Pelvis', 'US Abdominal Doppler'];
+      if (name === 'US ABDOMEN') {
+        return ['US Abdomen Complete', 'US Liver', 'US Gallbladder / Biliary', 'US Pancreas', 'US Spleen', 'US Kidneys', 'US Aorta'];
+      }
+      if (name === 'US PELVIS') {
+        return ['US Pelvis Transabdominal', 'US Pelvis Transvaginal', 'US Prostate (TRUS)', 'US Bladder'];
+      }
+      if (name === 'US OBSTETRICS') {
+        return ['Early Pregnancy', 'First Trimester', 'Second Trimester Anatomy Scan', 'Third Trimester Growth Scan', 'Biophysical Profile'];
+      }
+      if (name.includes('VASCULAR') || name.includes('DOPPLER')) {
+        return ['Carotid Doppler', 'Renal Doppler', 'Lower Extremity Venous Doppler', 'Lower Extremity Arterial Doppler', 'Upper Extremity Doppler', 'Portal Venous Doppler'];
+      }
+      if (name.includes('MUSCULOSKELETAL')) {
+        return ['Shoulder', 'Elbow', 'Wrist', 'Hip', 'Knee', 'Ankle / Foot', 'Soft Tissue Mass'];
+      }
+      if (name.includes('HEAD') || name.includes('NECK')) {
+        return ['Thyroid', 'Parathyroid', 'Neck Mass', 'Salivary Glands'];
+      }
+      if (name.includes('BREAST')) {
+        return ['Breast Ultrasound', 'Breast Mass Evaluation'];
+      }
+      if (name.includes('PEDIATRIC')) {
+        return ['Neonatal Brain', 'Pyloric Stenosis', 'Developmental Hip'];
+      }
+      if (name.includes('PROCEDURES')) {
+        return ['Ultrasound Guided Biopsy', 'Ultrasound Guided Drainage', 'Ultrasound Guided Aspiration'];
+      }
+      return [];
+    }
+    if (cat.modality === 'Other' && name.startsWith('PET ')) {
+      if (name === 'PET ONCOLOGY') {
+        return ['Whole Body PET-CT (FDG)', 'PET Tumor Staging', 'PET Treatment Response', 'PET Recurrence Evaluation'];
+      }
+      if (name === 'PET NEUROLOGY') {
+        return ['Brain PET (FDG)', 'Dementia PET', 'Epilepsy PET', 'Brain Tumor PET'];
+      }
+      if (name === 'PET CARDIAC') {
+        return ['Myocardial Perfusion PET', 'Cardiac Viability PET'];
+      }
+      if (name.includes('SPECIALIZED TRACERS')) {
+        return ['PSMA PET (Prostate cancer)', 'DOTATATE PET (Neuroendocrine tumors)', 'Amyloid PET (Alzheimer disease)'];
+      }
+      if (name.includes('INFECTION') || name.includes('INFLAMMATION')) {
+        return ['PET Fever of Unknown Origin', 'PET Vasculitis', 'PET Osteomyelitis'];
+      }
+      return [];
+    }
+    if (cat.modality === 'Other' && name.startsWith('XR ')) {
+      if (name === 'XR CHEST') {
+        return ['Chest PA', 'Chest AP', 'Chest Lateral', 'Portable Chest'];
+      }
+      if (name === 'XR ABDOMEN') {
+        return ['Abdomen (KUB)', 'Acute Abdomen Series'];
+      }
+      if (name.includes('SKULL') || name.includes('HEAD')) {
+        return ['Skull', 'Sinuses', 'Facial Bones'];
+      }
+      if (name === 'XR SPINE') {
+        return ['Cervical Spine', 'Thoracic Spine', 'Lumbar Spine', 'Sacrum / Coccyx', 'Scoliosis Series'];
+      }
+      if (name.includes('UPPER EXTREMITIES')) {
+        return ['Shoulder', 'Clavicle', 'Humerus', 'Elbow', 'Forearm', 'Wrist', 'Hand', 'Fingers'];
+      }
+      if (name.includes('LOWER EXTREMITIES')) {
+        return ['Pelvis', 'Hip', 'Femur', 'Knee', 'Tibia / Fibula', 'Ankle', 'Foot', 'Toes'];
+      }
+      if (name.includes('SPECIAL STUDIES')) {
+        return ['Bone Age', 'Skeletal Survey', 'Foreign Body'];
+      }
+      if (name.includes('FLUOROSCOPY')) {
+        return ['Barium Swallow', 'Barium Meal', 'Barium Enema', 'Upper GI Series'];
+      }
+      return [];
     }
     if (cat.modality === 'Angio') {
       return ['CT Angiography – Aorta', 'CT Angiography – Carotids', 'CT Angiography – Peripheral'];
@@ -266,6 +338,37 @@ export const ClericalIntake: React.FC = () => {
     'MRI VASCULAR',
   ] as const;
 
+  const US_CATEGORY_ORDER = [
+    'US ABDOMEN',
+    'US PELVIS',
+    'US OBSTETRICS',
+    'US VASCULAR / DOPPLER',
+    'US MUSCULOSKELETAL',
+    'US HEAD / NECK',
+    'US BREAST',
+    'US PEDIATRIC',
+    'US PROCEDURES',
+  ] as const;
+
+  const PET_CATEGORY_ORDER = [
+    'PET ONCOLOGY',
+    'PET NEUROLOGY',
+    'PET CARDIAC',
+    'PET SPECIALIZED TRACERS',
+    'PET INFECTION / INFLAMMATION',
+  ] as const;
+
+  const XR_CATEGORY_ORDER = [
+    'XR CHEST',
+    'XR ABDOMEN',
+    'XR SKULL / HEAD',
+    'XR SPINE',
+    'XR UPPER EXTREMITIES',
+    'XR LOWER EXTREMITIES',
+    'XR SPECIAL STUDIES',
+    'XR FLUOROSCOPY',
+  ] as const;
+
   const filteredCategories = modality
     ? modality.toUpperCase() === 'CT'
       ? CT_CATEGORY_ORDER.map((name) =>
@@ -274,6 +377,18 @@ export const ClericalIntake: React.FC = () => {
       : modality.toUpperCase() === 'MRI'
       ? MRI_CATEGORY_ORDER.map((name) =>
           categories.find((c) => c.modality.toUpperCase() === 'MRI' && c.name === name)
+        ).filter((c): c is Category => c != null)
+      : modality === 'US'
+      ? US_CATEGORY_ORDER.map((name) =>
+          categories.find((c) => c.modality === 'US' && c.name === name)
+        ).filter((c): c is Category => c != null)
+      : modality.toUpperCase() === 'PET'
+      ? PET_CATEGORY_ORDER.map((name) =>
+          categories.find((c) => c.modality === 'Other' && c.name === name)
+        ).filter((c): c is Category => c != null)
+      : modality === 'X-ray'
+      ? XR_CATEGORY_ORDER.map((name) =>
+          categories.find((c) => c.modality === 'Other' && c.name === name)
         ).filter((c): c is Category => c != null)
       : categories.filter((c) => c.modality.toLowerCase() === modality.toLowerCase())
     : [];
