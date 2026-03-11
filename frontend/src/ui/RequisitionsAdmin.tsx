@@ -115,6 +115,7 @@ export const RequisitionsAdmin: React.FC = () => {
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Clinic</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Site</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Status</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Required specialty</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>RVU</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Created</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Due date</th>
@@ -134,6 +135,9 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{r.site}</td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9', textTransform: 'capitalize' }}>
                     {r.status.replace(/_/g, ' ')}
+                  </td>
+                  <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                    {(r.specialtyRequirement?.requiredSubspecialties || ['general']).join(', ')}
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     <input
@@ -206,7 +210,7 @@ export const RequisitionsAdmin: React.FC = () => {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ padding: '0.75rem', color: '#94a3b8' }}>
+                  <td colSpan={12} style={{ padding: '0.75rem', color: '#94a3b8' }}>
                     No requisitions yet.
                   </td>
                 </tr>

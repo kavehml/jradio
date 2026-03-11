@@ -1,6 +1,10 @@
 import { Requisition } from '../db/models/Requisition';
 import { RequisitionImagingItem } from '../db/models/RequisitionImagingItem';
 import { Visit } from '../db/models/Visit';
+import { SpecialtyRule } from '../db/models/SpecialtyRule';
+import { RequisitionSpecialtyRequirement } from '../db/models/RequisitionSpecialtyRequirement';
+import { ImagingCategory } from '../db/models/ImagingCategory';
+import { Op } from 'sequelize';
 
 // Due date: if timeDelayPreset set, use it; else no imaging in 24h -> 3 months, has imaging in 24h -> 30 days.
 const DEFAULT_CONTROL_DAYS = 90;
@@ -40,6 +44,7 @@ export async function createRequisition(params: {
   bodyParts: string[];
   withContrast?: boolean;
   notes?: string;
+  selectedSubCategories?: string[];
 }) {
   const now = new Date();
   let calculatedDueDate: Date | null = null;
@@ -86,10 +91,48 @@ export async function createRequisition(params: {
     location: params.site,
   });
 
+  const category = await ImagingCategory.findByPk(params.categoryId, {
+    attributes: ['name'],
+  });
+  const categoryName = category?.name || '';
+  const selectedSubCategories = (params.selectedSubCategories || []).filter(Boolean);
+  let requiredSubspecialties: string[] = [];
+
+  if (selectedSubCategories.length) {
+    const subRules = await SpecialtyRule.findAll({
+      where: {
+        modality: params.modality,
+        categoryName,
+        subCategory: { [Op.in]: selectedSubCategories },
+      },
+    });
+    requiredSubspecialties = Array.from(
+      new Set(subRules.flatMap((r) => r.requiredSubspecialties || []))
+    );
+  }
+
+  if (!requiredSubspecialties.length) {
+    const categoryRule = await SpecialtyRule.findOne({
+      where: {
+        modality: params.modality,
+        categoryName,
+        subCategory: null,
+      },
+    });
+    requiredSubspecialties = categoryRule?.requiredSubspecialties || [];
+  }
+  if (!requiredSubspecialties.length) requiredSubspecialties = ['general'];
+
+  await RequisitionSpecialtyRequirement.create({
+    requisitionId: requisition.id,
+    requiredSubspecialties,
+  });
+
   return {
     id: requisition.id,
     visitNumber,
     calculatedDueDate: calculatedDueDate.toISOString(),
     status: requisition.status,
+    requiredSubspecialties,
   };
 }

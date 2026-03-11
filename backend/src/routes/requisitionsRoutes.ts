@@ -4,6 +4,7 @@ import { createRequisition } from '../services/requisitionService';
 import { Requisition } from '../db/models/Requisition';
 import { Visit } from '../db/models/Visit';
 import { RequisitionImagingItem } from '../db/models/RequisitionImagingItem';
+import { RequisitionSpecialtyRequirement } from '../db/models/RequisitionSpecialtyRequirement';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ function validateAndBuildParams(body: {
   bodyParts?: string[];
   withContrast?: boolean;
   notes?: string;
+  selectedSubCategories?: string[];
 }) {
   if (
     !body.patientIdOrTempLabel ||
@@ -51,6 +53,9 @@ function validateAndBuildParams(body: {
     ...(body.hasImagingWithin24h !== undefined && { hasImagingWithin24h: body.hasImagingWithin24h }),
     ...(body.withContrast !== undefined && { withContrast: body.withContrast }),
     ...(body.notes !== undefined && body.notes !== '' && { notes: body.notes }),
+    ...(Array.isArray(body.selectedSubCategories) && {
+      selectedSubCategories: body.selectedSubCategories,
+    }),
   };
 
   return { params } as const;
@@ -72,6 +77,7 @@ router.post('/', requireAuth, requireRole(['admin', 'clerical']), async (req, re
     bodyParts?: string[];
     withContrast?: boolean;
     notes?: string;
+    selectedSubCategories?: string[];
   };
 
   const validated = validateAndBuildParams(body);
@@ -104,6 +110,7 @@ router.post('/public', async (req, res) => {
     bodyParts?: string[];
     withContrast?: boolean;
     notes?: string;
+    selectedSubCategories?: string[];
   };
 
   const validated = validateAndBuildParams(body);
@@ -135,6 +142,11 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
           model: RequisitionImagingItem,
           as: 'imagingItems',
           attributes: ['rvuValue'],
+        },
+        {
+          model: RequisitionSpecialtyRequirement,
+          as: 'specialtyRequirement',
+          attributes: ['requiredSubspecialties'],
         },
       ],
       attributes: [

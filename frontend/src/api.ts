@@ -127,6 +127,7 @@ export async function createRequisition(
     bodyParts: string[];
     withContrast?: boolean;
     notes?: string;
+    selectedSubCategories?: string[];
   }
 ) {
   const res = await fetch(`${getApiBase()}/api/requisitions`, {
@@ -159,6 +160,7 @@ export async function createPublicRequisition(
     bodyParts: string[];
     withContrast?: boolean;
     notes?: string;
+    selectedSubCategories?: string[];
   }
 ) {
   const res = await fetch(`${getApiBase()}/api/requisitions/public`, {
@@ -234,6 +236,15 @@ export interface RequisitionSummary {
   createdAt: string;
   visit?: { visitNumber: string | null; scheduledDateTime?: string | null } | null;
   imagingItems?: { rvuValue: number }[];
+  specialtyRequirement?: { requiredSubspecialties: string[] } | null;
+}
+
+export interface SpecialtyRuleDto {
+  id: number;
+  modality: string;
+  categoryName: string;
+  subCategory: string | null;
+  requiredSubspecialties: string[];
 }
 
 export async function getRequisitions(token: string) {
@@ -350,6 +361,34 @@ export async function updateRequisitionRvu(token: string, id: number, rvuValue: 
     throw new Error((err as { error?: string }).error || 'Failed to update RVU');
   }
   return res.json() as Promise<{ requisitionId: number; rvuValue: number }>;
+}
+
+export async function getSpecialtyRules(token: string) {
+  const res = await fetch(`${getApiBase()}/api/specialty-rules`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load specialty rules');
+  const json = (await res.json()) as { rules: SpecialtyRuleDto[] };
+  return json.rules;
+}
+
+export async function saveSpecialtyRule(
+  token: string,
+  data: { modality: string; categoryName: string; subCategory: string | null; requiredSubspecialties: string[] }
+) {
+  const res = await fetch(`${getApiBase()}/api/specialty-rules`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to save specialty rule');
+  }
+  return res.json() as Promise<SpecialtyRuleDto>;
 }
 
 export async function createSite(token: string, name: string) {

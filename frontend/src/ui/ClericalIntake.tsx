@@ -429,6 +429,7 @@ export const ClericalIntake: React.FC = () => {
         categoryId: selectedCategory.id,
         modality,
         bodyParts: [selectedCategory.bodyPart],
+        selectedSubCategories: subCategories,
         withContrast: false,
         notes:
           (subCategories.length || (modality === 'MRI' && mriSequences.length)
