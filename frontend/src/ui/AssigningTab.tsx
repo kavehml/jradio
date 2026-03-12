@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AssigningDistributionResult,
   AssigningSummary,
+  downloadAssigningRadiologistPdf,
   distributeAssigning,
   getAssigningSummary,
   getShiftCoverage,
@@ -28,6 +29,7 @@ export const AssigningTab: React.FC = () => {
   const [selectedRadiologistId, setSelectedRadiologistId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [distributing, setDistributing] = useState(false);
+  const [downloadingPdfFor, setDownloadingPdfFor] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [distributionResult, setDistributionResult] = useState<AssigningDistributionResult | null>(null);
@@ -130,6 +132,28 @@ export const AssigningTab: React.FC = () => {
       setError(e instanceof Error ? e.message : 'Failed to distribute requisitions');
     } finally {
       setDistributing(false);
+    }
+  };
+
+  const handleDownloadPdf = async (radiologistId: number, radiologistName: string) => {
+    if (!token) return;
+    setDownloadingPdfFor(radiologistId);
+    setError(null);
+    try {
+      const blob = await downloadAssigningRadiologistPdf(token, { date, shift, radiologistId });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const safeName = radiologistName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.href = url;
+      link.download = `requisition-worklist-${safeName}-${date}-${shift.toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to download PDF');
+    } finally {
+      setDownloadingPdfFor(null);
     }
   };
 
@@ -282,6 +306,7 @@ export const AssigningTab: React.FC = () => {
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Target RVU</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Assigned RVU</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Assigned cases</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Worklist PDF</th>
                 </tr>
               </thead>
               <tbody>
@@ -292,6 +317,15 @@ export const AssigningTab: React.FC = () => {
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{p.targetRvu}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{p.assignedRvu}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{p.assignedRequisitionCount}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                      <button
+                        type="button"
+                        disabled={downloadingPdfFor === p.radiologistId}
+                        onClick={() => void handleDownloadPdf(p.radiologistId, p.radiologistName)}
+                      >
+                        {downloadingPdfFor === p.radiologistId ? 'Preparing...' : 'Download PDF'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

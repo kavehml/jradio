@@ -10,6 +10,7 @@ import { ReportingAssignment } from '../db/models/Assignments';
 import { ShiftAssignment, ShiftType } from '../db/models/ShiftAssignment';
 import { User } from '../db/models/User';
 import { Op } from 'sequelize';
+import PDFDocument from 'pdfkit';
 
 const router = Router();
 type AssigningShift = ShiftType | 'NA';
@@ -147,6 +148,47 @@ function buildParticipantShiftMap(shifts: Array<{ id: number; radiologistId: num
     }
   });
   return map;
+}
+
+function toDateOnly(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString().slice(0, 10);
+}
+
+function formatDob(value: Date | string | null | undefined): string {
+  const iso = toDateOnly(value);
+  return iso || '—';
+}
+
+function filterAssignmentsForDateShift<
+  T extends ReportingAssignment & {
+    shift?: { date?: Date | string | null; shiftType?: ShiftType | null } | null;
+    requisition?: {
+      calculatedDueDate?: Date | string | null;
+      visit?: { scheduledDateTime?: Date | string | null } | null;
+    } | null;
+  }
+>(
+  assignments: T[],
+  date: string,
+  shift: AssigningShift
+) {
+  return assignments.filter((assignment) => {
+    const shiftDate = toDateOnly(assignment.shift?.date);
+    const visitDate = toDateOnly(assignment.requisition?.visit?.scheduledDateTime);
+    const dueDate = toDateOnly(assignment.requisition?.calculatedDueDate);
+    const inDate = shiftDate === date || visitDate === date || dueDate === date;
+    if (!inDate) return false;
+    if (shift === 'NA') return true;
+    const shiftType = assignment.shift?.shiftType;
+    if (shiftType) return shiftType === shift;
+    const visitTime = assignment.requisition?.visit?.scheduledDateTime
+      ? new Date(assignment.requisition.visit.scheduledDateTime)
+      : null;
+    return visitTime ? isShiftMatch(visitTime, shift) : false;
+  });
 }
 
 function weightedDistribute(
@@ -575,6 +617,182 @@ router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async 
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to distribute requisitions' });
+  }
+});
+
+router.get('/assigning/radiologist-pdf', requireAuth, requireRole(['admin']), async (req, res) => {
+  const { date, shift, radiologistId } = req.query as {
+    date?: string;
+    shift?: AssigningShift;
+    radiologistId?: string;
+  };
+  if (!date || !shift || !['AM', 'PM', 'NIGHT', 'NA'].includes(shift)) {
+    return res.status(400).json({ error: 'date and shift (AM|PM|NIGHT|NA) are required' });
+  }
+  const userId = Number(radiologistId);
+  if (!Number.isInteger(userId)) {
+    return res.status(400).json({ error: 'radiologistId is required' });
+  }
+
+  try {
+    const user = await User.findByPk(userId, { attributes: ['id', 'name'] });
+    if (!user) return res.status(404).json({ error: 'Radiologist not found' });
+
+    const rawAssignments = await ReportingAssignment.findAll({
+      where: {
+        reportingRadiologistId: userId,
+        status: { [Op.in]: ['assigned', 'completed'] },
+      },
+      include: [
+        {
+          model: ShiftAssignment,
+          as: 'shift',
+          required: false,
+          attributes: ['id', 'date', 'shiftType'],
+        },
+        {
+          model: Requisition,
+          as: 'requisition',
+          attributes: ['id', 'patientIdOrTempLabel', 'patientName', 'patientDateOfBirth', 'calculatedDueDate'],
+          include: [
+            {
+              model: Visit,
+              as: 'visit',
+              attributes: ['visitNumber', 'scheduledDateTime'],
+            },
+            {
+              model: RequisitionImagingItem,
+              as: 'imagingItems',
+              attributes: ['modality', 'specialNotes'],
+              include: [{ model: ImagingCategory, as: 'category', attributes: ['name'] }],
+            },
+          ],
+        },
+      ],
+      order: [['assignedAt', 'ASC']],
+    });
+
+    const assignments = rawAssignments as Array<
+      ReportingAssignment & {
+        shift?: { date?: Date | string | null; shiftType?: ShiftType | null } | null;
+        requisition?: {
+          id: number;
+          patientIdOrTempLabel: string;
+          patientName?: string | null;
+          patientDateOfBirth?: Date | string | null;
+          calculatedDueDate?: Date | string | null;
+          visit?: { visitNumber?: string | null; scheduledDateTime?: Date | string | null } | null;
+          imagingItems?: Array<{
+            modality?: string | null;
+            specialNotes?: string | null;
+            category?: { name?: string | null } | null;
+          }>;
+        } | null;
+      }
+    >;
+
+    const filtered = filterAssignmentsForDateShift(assignments, date, shift);
+
+    const rows = filtered
+      .map((assignment) => {
+        const reqn = assignment.requisition;
+        if (!reqn) return null;
+        const item = reqn.imagingItems?.[0];
+        const parsedSubCategories = parseSubCategoriesFromNotes(item?.specialNotes);
+        return {
+          mrn: reqn.patientIdOrTempLabel || '—',
+          name: reqn.patientName?.trim() || '—',
+          dob: formatDob(reqn.patientDateOfBirth),
+          modality: item?.modality || '—',
+          category: item?.category?.name || '—',
+          subCategories: parsedSubCategories.join(', ') || '—',
+          additionalNotes: stripManagedPrefixes(item?.specialNotes) || '—',
+        };
+      })
+      .filter(Boolean) as Array<{
+      mrn: string;
+      name: string;
+      dob: string;
+      modality: string;
+      category: string;
+      subCategories: string;
+      additionalNotes: string;
+    }>;
+
+    const safeDate = date.replace(/[^0-9-]/g, '');
+    const safeShift = shift.toLowerCase();
+    const safeName = user.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="requisition-worklist-${safeName}-${safeDate}-${safeShift}.pdf"`
+    );
+
+    const doc = new PDFDocument({ margin: 24, size: 'A4', layout: 'landscape' });
+    doc.pipe(res);
+
+    doc.fontSize(14).text('Radiologist Requisition Worklist', { align: 'left' });
+    doc.moveDown(0.25);
+    doc
+      .fontSize(10)
+      .fillColor('#334155')
+      .text(`Radiologist: ${user.name}   |   Date: ${date}   |   Shift: ${shift === 'NA' ? 'All day' : shift}`);
+    doc.moveDown(0.5);
+    doc.fillColor('#111827').fontSize(9).text(`Total requisitions: ${rows.length}`);
+    doc.moveDown(0.5);
+
+    const columns = [
+      { key: 'mrn', label: 'MRN', width: 85 },
+      { key: 'name', label: 'Name', width: 110 },
+      { key: 'dob', label: 'DOB', width: 70 },
+      { key: 'modality', label: 'Modality', width: 65 },
+      { key: 'category', label: 'Category', width: 105 },
+      { key: 'subCategories', label: 'Sub-categories', width: 165 },
+      { key: 'additionalNotes', label: 'Additional notes', width: 160 },
+    ] as const;
+
+    const drawHeader = () => {
+      const headerTop = doc.y;
+      let x = doc.page.margins.left;
+      doc.font('Helvetica-Bold').fontSize(8);
+      columns.forEach((c) => {
+        doc.rect(x, headerTop, c.width, 20).stroke('#cbd5e1');
+        doc.text(c.label, x + 3, headerTop + 6, { width: c.width - 6, align: 'left' });
+        x += c.width;
+      });
+      doc.moveDown(1.4);
+      doc.font('Helvetica').fontSize(8);
+    };
+
+    drawHeader();
+    rows.forEach((row) => {
+      const heights = columns.map((c) =>
+        doc.heightOfString(row[c.key], { width: c.width - 6, align: 'left' }) + 8
+      );
+      const rowHeight = Math.max(22, ...heights);
+
+      if (doc.y + rowHeight > doc.page.height - doc.page.margins.bottom) {
+        doc.addPage({ size: 'A4', layout: 'landscape', margin: 24 });
+        drawHeader();
+      }
+
+      let x = doc.page.margins.left;
+      const top = doc.y;
+      columns.forEach((c) => {
+        doc.rect(x, top, c.width, rowHeight).stroke('#e2e8f0');
+        doc.text(row[c.key], x + 3, top + 4, {
+          width: c.width - 6,
+          align: 'left',
+        });
+        x += c.width;
+      });
+      doc.y = top + rowHeight;
+    });
+
+    doc.end();
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to generate radiologist PDF' });
   }
 });
 
