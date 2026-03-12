@@ -9,7 +9,7 @@ import {
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
-type ShiftChoice = 'AM' | 'PM' | 'NIGHT';
+type ShiftChoice = 'AM' | 'PM' | 'NIGHT' | 'NA';
 
 interface ParticipantRow {
   radiologistId: number;
@@ -49,13 +49,26 @@ export const AssigningTab: React.FC = () => {
         .sort((a, b) => a.name.localeCompare(b.name));
       setAllRadiologists(radiologists);
 
-      const coverageEntry = coverage.find((c) => c.date === date && c.shiftType === shift);
-      const autoParticipants: ParticipantRow[] = (coverageEntry?.radiologists || []).map((r) => ({
-        radiologistId: r.id,
-        name: r.name,
-        weight: 1,
-        fromCalendar: true,
-      }));
+      const relevantCoverage =
+        shift === 'NA'
+          ? coverage.filter((c) => c.date === date)
+          : coverage.filter((c) => c.date === date && c.shiftType === shift);
+      const byId = new Map<number, ParticipantRow>();
+      relevantCoverage.forEach((entry) => {
+        entry.radiologists.forEach((r) => {
+          if (!byId.has(r.id)) {
+            byId.set(r.id, {
+              radiologistId: r.id,
+              name: r.name,
+              weight: 1,
+              fromCalendar: true,
+            });
+          }
+        });
+      });
+      const autoParticipants: ParticipantRow[] = Array.from(byId.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
       setParticipants(autoParticipants);
       setSummary(summaryRes);
       setSelectedRadiologistId(radiologists[0]?.id ?? null);
@@ -134,6 +147,7 @@ export const AssigningTab: React.FC = () => {
             <option value="AM">AM</option>
             <option value="PM">PM</option>
             <option value="NIGHT">Night</option>
+            <option value="NA">N/A (All day)</option>
           </select>
         </label>
         <button type="button" onClick={() => void loadAssigningContext()} disabled={loading}>
@@ -156,6 +170,7 @@ export const AssigningTab: React.FC = () => {
           <div>Approved for slot: {summary.approvedForShiftCount}</div>
           <div>Eligible to assign: {summary.eligibleCount}</div>
           <div>Already assigned: {summary.alreadyAssignedCount}</div>
+          <div>Completed (locked): {summary.completedCount ?? 0}</div>
           <div>Total eligible RVU: {summary.totalRvu}</div>
           <div>Total member weight: {totalWeight.toFixed(2)}</div>
         </div>
@@ -163,6 +178,11 @@ export const AssigningTab: React.FC = () => {
 
       <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem', display: 'grid', gap: 10 }}>
         <strong>Radiologists for this shift</strong>
+        {shift === 'NA' && (
+          <p style={{ margin: 0, color: '#475569', fontSize: '0.86rem' }}>
+            N/A (All day) auto-loads radiologists from AM, PM, and Night shifts on this date.
+          </p>
+        )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <select
             value={selectedRadiologistId ?? ''}
@@ -244,7 +264,7 @@ export const AssigningTab: React.FC = () => {
           onClick={() => void runDistribution()}
           disabled={distributing || participants.length === 0 || (summary?.eligibleCount ?? 0) === 0}
         >
-          {distributing ? 'Distributing...' : 'Distribute approved requisitions'}
+          {distributing ? 'Distributing...' : 'Distribute / Redistribute'}
         </button>
         {message && <span style={{ color: '#166534' }}>{message}</span>}
         {error && <span style={{ color: '#b91c1c' }}>{error}</span>}

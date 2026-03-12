@@ -382,14 +382,16 @@ export interface AssigningSummaryRow {
   patientIdOrTempLabel: string;
   rvuValue: number;
   alreadyAssigned: boolean;
+  hasCompleted?: boolean;
 }
 
 export interface AssigningSummary {
   date: string;
-  shift: 'AM' | 'PM' | 'NIGHT';
+  shift: 'AM' | 'PM' | 'NIGHT' | 'NA';
   approvedForShiftCount: number;
   eligibleCount: number;
   alreadyAssignedCount: number;
+  completedCount?: number;
   totalRvu: number;
   rows: AssigningSummaryRow[];
 }
@@ -401,7 +403,7 @@ export interface AssigningParticipantInput {
 
 export interface AssigningDistributionResult {
   date: string;
-  shift: 'AM' | 'PM' | 'NIGHT';
+  shift: 'AM' | 'PM' | 'NIGHT' | 'NA';
   assignedCount: number;
   totalRvu: number;
   participants: Array<{
@@ -414,6 +416,7 @@ export interface AssigningDistributionResult {
     requisitionIds: number[];
   }>;
   unassignedCount: number;
+  redistributed?: boolean;
 }
 
 export interface SpecialtyRuleDto {
@@ -455,7 +458,11 @@ export async function createRequisitionsBulk(
   return payload as BulkRequisitionCreateResult;
 }
 
-export async function getAssigningSummary(token: string, date: string, shift: 'AM' | 'PM' | 'NIGHT') {
+export async function getAssigningSummary(
+  token: string,
+  date: string,
+  shift: 'AM' | 'PM' | 'NIGHT' | 'NA'
+) {
   const query = new URLSearchParams({ date, shift });
   const res = await fetch(`${getApiBase()}/api/requisitions/assigning/summary?${query.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -469,7 +476,7 @@ export async function getAssigningSummary(token: string, date: string, shift: 'A
 
 export async function distributeAssigning(
   token: string,
-  data: { date: string; shift: 'AM' | 'PM' | 'NIGHT'; participants: AssigningParticipantInput[] }
+  data: { date: string; shift: 'AM' | 'PM' | 'NIGHT' | 'NA'; participants: AssigningParticipantInput[] }
 ) {
   const res = await fetch(`${getApiBase()}/api/requisitions/assigning/distribute`, {
     method: 'POST',

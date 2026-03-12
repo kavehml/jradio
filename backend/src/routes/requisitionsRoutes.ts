@@ -12,6 +12,7 @@ import { User } from '../db/models/User';
 import { Op } from 'sequelize';
 
 const router = Router();
+type AssigningShift = ShiftType | 'NA';
 
 function parseIsoDateOnly(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -27,13 +28,13 @@ function isShiftMatch(dt: Date, shift: ShiftType): boolean {
   return h >= 22 || h < 6;
 }
 
-async function loadShiftApprovedRequisitions(params: { date: string; shift: ShiftType }) {
+async function loadShiftApprovedRequisitions(params: { date: string; shift: AssigningShift }) {
   const dayStart = parseIsoDateOnly(params.date);
   if (!dayStart) return [];
   const dayEnd = new Date(dayStart);
   dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
-  const requisitionsRaw = await Requisition.findAll({
+  const scheduledRaw = await Requisition.findAll({
     where: { status: 'approved' },
     include: [
       {
@@ -56,26 +57,96 @@ async function loadShiftApprovedRequisitions(params: { date: string; shift: Shif
         model: ReportingAssignment,
         as: 'reportingAssignments',
         required: false,
-        where: { status: { [Op.in]: ['assigned', 'completed'] } },
-        attributes: ['id', 'status'],
+        where: { status: { [Op.in]: ['assigned', 'completed', 'returned_to_pool'] } },
+        attributes: ['id', 'status', 'shiftId'],
       },
     ],
-    attributes: ['id', 'patientIdOrTempLabel'],
+    attributes: ['id', 'patientIdOrTempLabel', 'calculatedDueDate'],
     order: [['id', 'ASC']],
   });
 
-  const requisitions = requisitionsRaw as Array<
+  const scheduled = scheduledRaw as Array<
     Requisition & {
       visit?: { visitNumber?: string | null; scheduledDateTime?: Date | string | null } | null;
       imagingItems?: Array<{ rvuValue?: number | null }>;
-      reportingAssignments?: Array<{ id: number; status: string }>;
+      reportingAssignments?: Array<{ id: number; status: string; shiftId?: number | null }>;
+      calculatedDueDate?: Date | string | null;
     }
   >;
 
-  return requisitions.filter((r) => {
-    const scheduled = r.visit?.scheduledDateTime ? new Date(r.visit.scheduledDateTime) : null;
-    return scheduled ? isShiftMatch(scheduled, params.shift) : false;
+  const inShift = scheduled.filter((r) => {
+    const scheduledDateTime = r.visit?.scheduledDateTime;
+    if (!scheduledDateTime) return false;
+    if (params.shift === 'NA') return true;
+    return isShiftMatch(new Date(scheduledDateTime), params.shift);
   });
+
+  if (params.shift !== 'NA') return inShift;
+
+  // For full-day distribution, also include approved requisitions due that day with shift N/A.
+  const unscheduledRaw = await Requisition.findAll({
+    where: {
+      status: 'approved',
+      calculatedDueDate: {
+        [Op.gte]: dayStart,
+        [Op.lt]: dayEnd,
+      },
+    },
+    include: [
+      {
+        model: Visit,
+        as: 'visit',
+        required: false,
+        attributes: ['visitNumber', 'scheduledDateTime'],
+      },
+      {
+        model: RequisitionImagingItem,
+        as: 'imagingItems',
+        attributes: ['rvuValue'],
+      },
+      {
+        model: ReportingAssignment,
+        as: 'reportingAssignments',
+        required: false,
+        where: { status: { [Op.in]: ['assigned', 'completed', 'returned_to_pool'] } },
+        attributes: ['id', 'status', 'shiftId'],
+      },
+    ],
+    attributes: ['id', 'patientIdOrTempLabel', 'calculatedDueDate'],
+    order: [['id', 'ASC']],
+  });
+
+  const unscheduled = unscheduledRaw as Array<
+    Requisition & {
+      visit?: { visitNumber?: string | null; scheduledDateTime?: Date | string | null } | null;
+      imagingItems?: Array<{ rvuValue?: number | null }>;
+      reportingAssignments?: Array<{ id: number; status: string; shiftId?: number | null }>;
+      calculatedDueDate?: Date | string | null;
+    }
+  >;
+
+  const unscheduledOnly = unscheduled.filter((r) => !r.visit?.scheduledDateTime);
+  const merged = new Map<number, (typeof unscheduledOnly)[number]>();
+  inShift.forEach((r) => merged.set(r.id, r));
+  unscheduledOnly.forEach((r) => merged.set(r.id, r));
+  return Array.from(merged.values()).sort((a, b) => a.id - b.id);
+}
+
+function getShiftPriority(shiftType: ShiftType): number {
+  if (shiftType === 'AM') return 1;
+  if (shiftType === 'PM') return 2;
+  return 3;
+}
+
+function buildParticipantShiftMap(shifts: Array<{ id: number; radiologistId: number; shiftType: ShiftType }>) {
+  const map = new Map<number, number>();
+  const sorted = [...shifts].sort((a, b) => getShiftPriority(a.shiftType) - getShiftPriority(b.shiftType));
+  sorted.forEach((s) => {
+    if (!map.has(s.radiologistId)) {
+      map.set(s.radiologistId, s.id);
+    }
+  });
+  return map;
 }
 
 function weightedDistribute(
@@ -365,27 +436,30 @@ router.post('/bulk', requireAuth, requireRole(['admin', 'clerical']), async (req
 });
 
 router.get('/assigning/summary', requireAuth, requireRole(['admin']), async (req, res) => {
-  const { date, shift } = req.query as { date?: string; shift?: ShiftType };
-  if (!date || !shift || !['AM', 'PM', 'NIGHT'].includes(shift)) {
-    return res.status(400).json({ error: 'date (YYYY-MM-DD) and shift (AM|PM|NIGHT) are required' });
+  const { date, shift } = req.query as { date?: string; shift?: AssigningShift };
+  if (!date || !shift || !['AM', 'PM', 'NIGHT', 'NA'].includes(shift)) {
+    return res.status(400).json({ error: 'date (YYYY-MM-DD) and shift (AM|PM|NIGHT|NA) are required' });
   }
   try {
     const requisitions = await loadShiftApprovedRequisitions({ date, shift });
     const rows = requisitions.map((r) => {
       const rvuValue = r.imagingItems?.[0]?.rvuValue ?? 1;
-      const alreadyAssigned = Boolean(r.reportingAssignments?.length);
+      const hasCompleted = Boolean(r.reportingAssignments?.some((a) => a.status === 'completed'));
+      const alreadyAssigned = Boolean(r.reportingAssignments?.some((a) => a.status === 'assigned'));
       return {
         id: r.id,
         visitNumber: r.visit?.visitNumber ?? null,
         patientIdOrTempLabel: r.patientIdOrTempLabel,
         rvuValue,
         alreadyAssigned,
+        hasCompleted,
       };
     });
     const approvedForShiftCount = rows.length;
-    const eligibleRows = rows.filter((r) => !r.alreadyAssigned);
+    const eligibleRows = rows.filter((r) => !r.hasCompleted);
     const eligibleCount = eligibleRows.length;
-    const alreadyAssignedCount = approvedForShiftCount - eligibleCount;
+    const alreadyAssignedCount = rows.filter((r) => r.alreadyAssigned).length;
+    const completedCount = rows.filter((r) => r.hasCompleted).length;
     const totalRvu = eligibleRows.reduce((sum, r) => sum + r.rvuValue, 0);
     return res.json({
       date,
@@ -393,6 +467,7 @@ router.get('/assigning/summary', requireAuth, requireRole(['admin']), async (req
       approvedForShiftCount,
       eligibleCount,
       alreadyAssignedCount,
+      completedCount,
       totalRvu,
       rows,
     });
@@ -405,10 +480,10 @@ router.get('/assigning/summary', requireAuth, requireRole(['admin']), async (req
 router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async (req, res) => {
   const body = req.body as {
     date?: string;
-    shift?: ShiftType;
+    shift?: AssigningShift;
     participants?: Array<{ radiologistId?: number; weight?: number }>;
   };
-  if (!body.date || !body.shift || !['AM', 'PM', 'NIGHT'].includes(body.shift)) {
+  if (!body.date || !body.shift || !['AM', 'PM', 'NIGHT', 'NA'].includes(body.shift)) {
     return res.status(400).json({ error: 'date and shift are required' });
   }
   const participants = Array.isArray(body.participants) ? body.participants : [];
@@ -422,11 +497,22 @@ router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async 
   try {
     const requisitions = await loadShiftApprovedRequisitions({ date: body.date, shift: body.shift });
     const eligible = requisitions
-      .filter((r) => !r.reportingAssignments?.length)
+      .filter((r) => !r.reportingAssignments?.some((a) => a.status === 'completed'))
       .map((r) => ({
         id: r.id,
         rvuValue: r.imagingItems?.[0]?.rvuValue ?? 1,
       }));
+
+    const eligibleIds = eligible.map((r) => r.id);
+    if (eligibleIds.length) {
+      // Redistribution: clear previous "assigned" workload for this scope, then recalculate.
+      await ReportingAssignment.destroy({
+        where: {
+          requisitionId: { [Op.in]: eligibleIds },
+          status: 'assigned',
+        },
+      });
+    }
 
     const distribution = weightedDistribute(eligible, normalizedParticipants);
     const participantIds = Array.from(new Set(distribution.map((d) => d.radiologistId)));
@@ -439,12 +525,12 @@ router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async 
     const shifts = await ShiftAssignment.findAll({
       where: {
         date: body.date,
-        shiftType: body.shift,
+        ...(body.shift === 'NA' ? {} : { shiftType: body.shift }),
         radiologistId: { [Op.in]: participantIds },
       },
-      attributes: ['id', 'radiologistId'],
+      attributes: ['id', 'radiologistId', 'shiftType'],
     });
-    const shiftIdByRadiologist = new Map(shifts.map((s) => [s.radiologistId, s.id]));
+    const shiftIdByRadiologist = buildParticipantShiftMap(shifts);
 
     const toCreate: Array<{
       requisitionId: number;
@@ -484,6 +570,7 @@ router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async 
         requisitionIds: d.requisitionIds,
       })),
       unassignedCount: 0,
+      redistributed: true,
     });
   } catch (err) {
     console.error(err);
