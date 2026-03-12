@@ -126,6 +126,45 @@ router.post('/time-delay-options', requireAuth, requireRole(['admin']), async (r
   }
 });
 
+router.patch('/time-delay-options/:id', requireAuth, requireRole(['admin']), async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body as { label?: string; hours?: number; active?: boolean };
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: 'Invalid option id' });
+  }
+  try {
+    const option = await TimeDelayOption.findByPk(id);
+    if (!option) return res.status(404).json({ error: 'Time delay option not found' });
+
+    if (body.label !== undefined) {
+      const label = body.label.trim();
+      if (!label) return res.status(400).json({ error: 'Label cannot be empty' });
+      option.label = label;
+    }
+    if (body.hours !== undefined) {
+      const hours = Number(body.hours);
+      if (!Number.isFinite(hours) || hours <= 0) {
+        return res.status(400).json({ error: 'Hours must be a positive number' });
+      }
+      option.hours = hours;
+    }
+    if (body.active !== undefined) {
+      option.active = Boolean(body.active);
+    }
+    await option.save();
+    return res.json({
+      id: option.id,
+      code: option.code,
+      label: option.label,
+      hours: option.hours,
+      active: option.active,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update time delay option' });
+  }
+});
+
 // Public read‑only endpoints for external requisition form
 router.get('/public/clinics', async (_req, res) => {
   try {

@@ -122,6 +122,7 @@ export interface TimeDelayOptionDto {
   code: string;
   label: string;
   hours: number;
+  active?: boolean;
 }
 
 export async function getImagingSubCategories(token: string) {
@@ -302,6 +303,26 @@ export async function createTimeDelayOption(token: string, data: { label: string
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { error?: string }).error || 'Failed to create time delay option');
+  }
+  return res.json() as Promise<TimeDelayOptionDto>;
+}
+
+export async function updateTimeDelayOption(
+  token: string,
+  id: number,
+  data: { label?: string; hours?: number; active?: boolean }
+) {
+  const res = await fetch(`${getApiBase()}/api/meta/time-delay-options/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update time delay option');
   }
   return res.json() as Promise<TimeDelayOptionDto>;
 }

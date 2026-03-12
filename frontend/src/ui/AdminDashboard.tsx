@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
   createTimeDelayOption,
+  updateTimeDelayOption,
   createClinic,
   createSite,
   createUser,
@@ -30,6 +31,7 @@ export const AdminDashboard: React.FC = () => {
   const [timeDelayOptions, setTimeDelayOptions] = useState<TimeDelayOptionDto[]>([]);
   const [newDelayLabel, setNewDelayLabel] = useState('');
   const [newDelayHours, setNewDelayHours] = useState('');
+  const [delayEdits, setDelayEdits] = useState<Record<number, { label: string; hours: string }>>({});
 
   const subspecialtyOptions = [
     { id: 'general', label: 'General' },
@@ -178,12 +180,39 @@ export const AdminDashboard: React.FC = () => {
     try {
       const created = await createTimeDelayOption(token, { label, hours });
       setTimeDelayOptions((prev) => [...prev, created].sort((a, b) => a.hours - b.hours));
+      setDelayEdits((prev) => ({
+        ...prev,
+        [created.id]: { label: created.label, hours: String(created.hours) },
+      }));
       setNewDelayLabel('');
       setNewDelayHours('');
     } catch (err) {
       setMessage({
         type: 'err',
         text: err instanceof Error ? err.message : 'Failed to add time delay option',
+      });
+    }
+  };
+
+  const handleSaveTimeDelay = async (id: number) => {
+    if (!token) return;
+    const draft = delayEdits[id];
+    if (!draft) return;
+    const label = draft.label.trim();
+    const hours = Number(draft.hours);
+    if (!label || !Number.isFinite(hours) || hours <= 0) {
+      setMessage({ type: 'err', text: 'Delay option needs a valid label and positive hours' });
+      return;
+    }
+    try {
+      const updated = await updateTimeDelayOption(token, id, { label, hours });
+      setTimeDelayOptions((prev) =>
+        prev.map((o) => (o.id === id ? updated : o)).sort((a, b) => a.hours - b.hours)
+      );
+    } catch (err) {
+      setMessage({
+        type: 'err',
+        text: err instanceof Error ? err.message : 'Failed to update delay option',
       });
     }
   };
@@ -312,12 +341,41 @@ export const AdminDashboard: React.FC = () => {
               Add
             </button>
           </form>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 180, overflowY: 'auto', fontSize: '0.9rem' }}>
-            {timeDelayOptions.map((opt) => (
-              <li key={opt.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #e2e8f0' }}>
-                {opt.label} ({opt.hours}h)
-              </li>
-            ))}
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 260, overflowY: 'auto', fontSize: '0.9rem' }}>
+            {timeDelayOptions.map((opt) => {
+              const draft = delayEdits[opt.id] ?? { label: opt.label, hours: String(opt.hours) };
+              return (
+                <li key={opt.id} style={{ padding: '0.45rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <input
+                      value={draft.label}
+                      onChange={(e) =>
+                        setDelayEdits((prev) => ({
+                          ...prev,
+                          [opt.id]: { ...draft, label: e.target.value },
+                        }))
+                      }
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6 }}>
+                      <input
+                        type="number"
+                        min={1}
+                        value={draft.hours}
+                        onChange={(e) =>
+                          setDelayEdits((prev) => ({
+                            ...prev,
+                            [opt.id]: { ...draft, hours: e.target.value },
+                          }))
+                        }
+                      />
+                      <button type="button" onClick={() => void handleSaveTimeDelay(opt.id)}>
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
             {timeDelayOptions.length === 0 && <li style={{ color: '#94a3b8' }}>No options yet.</li>}
           </ul>
         </div>

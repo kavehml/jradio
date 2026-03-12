@@ -525,7 +525,9 @@ export const ClericalIntake: React.FC = () => {
                   padding: '0.35rem 0.9rem',
                   borderRadius: 999,
                   border: modality === m ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                  background: modality === m ? '#eff6ff' : 'white',
+                  background: modality === m ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fbff',
+                  color: modality === m ? '#1d4ed8' : '#334155',
+                  fontWeight: 600,
                   cursor: 'pointer',
                   fontSize: '0.9rem',
                 }}
