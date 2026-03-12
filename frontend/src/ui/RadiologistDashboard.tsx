@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../auth/AuthContext';
 
 type ShiftType = 'AM' | 'PM' | 'NIGHT';
+type ViewMode = 'month' | 'week' | 'day';
 
 const SHIFT_TYPES: ShiftType[] = ['AM', 'PM', 'NIGHT'];
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -24,6 +25,25 @@ function monthRange(anchor: Date) {
   const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
   return { start, end };
+}
+
+function weekRange(anchor: Date) {
+  const start = new Date(anchor);
+  start.setDate(anchor.getDate() - anchor.getDay());
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return { start, end };
+}
+
+function buildWeekDays(anchor: Date) {
+  const { start } = weekRange(anchor);
+  const days: Date[] = [];
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    days.push(d);
+  }
+  return days;
 }
 
 function buildCalendarGrid(anchor: Date) {
@@ -42,7 +62,8 @@ function buildCalendarGrid(anchor: Date) {
 export const RadiologistDashboard: React.FC = () => {
   const { token, user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [monthAnchor, setMonthAnchor] = useState(() => new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [viewAnchor, setViewAnchor] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string>(() => toIsoDate(new Date()));
   const [defaultSite, setDefaultSite] = useState('General');
   const [radiologists, setRadiologists] = useState<UserDto[]>([]);
@@ -54,8 +75,16 @@ export const RadiologistDashboard: React.FC = () => {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [localMaxRvu, setLocalMaxRvu] = useState<Record<string, string>>({});
 
-  const calendarDays = useMemo(() => buildCalendarGrid(monthAnchor), [monthAnchor]);
-  const { start, end } = useMemo(() => monthRange(monthAnchor), [monthAnchor]);
+  const calendarDays = useMemo(() => buildCalendarGrid(viewAnchor), [viewAnchor]);
+  const weekDays = useMemo(() => buildWeekDays(viewAnchor), [viewAnchor]);
+  const { start, end } = useMemo(() => {
+    if (viewMode === 'week') return weekRange(viewAnchor);
+    if (viewMode === 'day') {
+      const day = new Date(viewAnchor);
+      return { start: day, end: day };
+    }
+    return monthRange(viewAnchor);
+  }, [viewMode, viewAnchor]);
   const from = toIsoDate(start);
   const to = toIsoDate(end);
   const targetRadiologistId = isAdmin ? selectedRadiologistId : null;
@@ -96,6 +125,17 @@ export const RadiologistDashboard: React.FC = () => {
   useEffect(() => {
     refresh();
   }, [token, from, to, targetRadiologistId]);
+
+  useEffect(() => {
+    if (viewMode !== 'day') return;
+    setSelectedDate(toIsoDate(viewAnchor));
+  }, [viewMode, viewAnchor]);
+
+  useEffect(() => {
+    if (selectedDate < from || selectedDate > to) {
+      setSelectedDate(from);
+    }
+  }, [from, to]);
 
   useEffect(() => {
     if (!token || !isAdmin) return;
@@ -177,10 +217,39 @@ export const RadiologistDashboard: React.FC = () => {
     }
   };
 
-  const monthName = monthAnchor.toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
+  const headerLabel = (() => {
+    if (viewMode === 'day') {
+      return viewAnchor.toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    }
+    if (viewMode === 'week') {
+      const w = weekRange(viewAnchor);
+      return `${w.start.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      })} - ${w.end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+    return viewAnchor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  })();
+
+  const moveView = (dir: -1 | 1) => {
+    setViewAnchor((prev) => {
+      const next = new Date(prev);
+      if (viewMode === 'month') next.setMonth(prev.getMonth() + dir);
+      else if (viewMode === 'week') next.setDate(prev.getDate() + dir * 7);
+      else next.setDate(prev.getDate() + dir);
+      return next;
+    });
+  };
+
+  const onPickDate = (date: string) => {
+    setSelectedDate(date);
+    setViewAnchor(new Date(date));
+  };
 
   return (
     <section style={{ maxWidth: 1320, margin: '0 auto' }}>
@@ -192,13 +261,30 @@ export const RadiologistDashboard: React.FC = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => setMonthAnchor((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>
+          <button type="button" onClick={() => moveView(-1)}>
             Previous
           </button>
-          <strong style={{ minWidth: 160, textAlign: 'center' }}>{monthName}</strong>
-          <button type="button" onClick={() => setMonthAnchor((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>
+          <strong style={{ minWidth: 220, textAlign: 'center' }}>{headerLabel}</strong>
+          <button type="button" onClick={() => moveView(1)}>
             Next
           </button>
+          <div style={{ display: 'inline-flex', border: '1px solid #dbe2f0', borderRadius: 10, overflow: 'hidden' }}>
+            {(['month', 'week', 'day'] as ViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                style={{
+                  borderRadius: 0,
+                  border: 'none',
+                  background: viewMode === mode ? '#5b63f6' : 'white',
+                  color: viewMode === mode ? 'white' : '#334155',
+                }}
+              >
+                {mode[0].toUpperCase() + mode.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -225,63 +311,152 @@ export const RadiologistDashboard: React.FC = () => {
 
       <div className="calendar-shell" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, marginTop: 14 }}>
         <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e2e8f0' }}>
-            {WEEKDAY_LABELS.map((label) => (
-              <div key={label} style={{ padding: '0.6rem', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '0.84rem' }}>
-                {label}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
-            {calendarDays.map((d) => {
-              const date = toIsoDate(d);
-              const inMonth = d.getMonth() === monthAnchor.getMonth();
-              const active = date === selectedDate;
-              return (
-                <button
-                  key={date}
-                  type="button"
-                  onClick={() => setSelectedDate(date)}
-                  style={{
-                    borderRadius: 0,
-                    border: '1px solid #eef2f7',
-                    borderLeft: 'none',
-                    borderTop: 'none',
-                    background: active ? '#eef2ff' : inMonth ? 'white' : '#f8fafc',
-                    color: '#0f172a',
-                    textAlign: 'left',
-                    padding: '0.5rem',
-                    minHeight: 118,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, marginBottom: 6, color: inMonth ? '#111827' : '#94a3b8' }}>
-                    {d.getDate()}
-                  </div>
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    {SHIFT_TYPES.map((shiftType) => {
-                      const cov = coverageMap.get(`${date}_${shiftType}`);
-                      const mine = isMine(date, shiftType);
-                      return (
-                        <div
-                          key={shiftType}
+          {viewMode !== 'day' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e2e8f0' }}>
+              {WEEKDAY_LABELS.map((label) => (
+                <div key={label} style={{ padding: '0.6rem', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '0.84rem' }}>
+                  {label}
+                </div>
+              ))}
+            </div>
+          )}
+          {viewMode === 'month' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+              {calendarDays.map((d) => {
+                const date = toIsoDate(d);
+                const inMonth = d.getMonth() === viewAnchor.getMonth();
+                const active = date === selectedDate;
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    onClick={() => onPickDate(date)}
+                    style={{
+                      borderRadius: 0,
+                      border: '1px solid #eef2f7',
+                      borderLeft: 'none',
+                      borderTop: 'none',
+                      background: active ? '#eef2ff' : inMonth ? 'white' : '#f8fafc',
+                      color: '#0f172a',
+                      textAlign: 'left',
+                      padding: '0.5rem',
+                      minHeight: 118,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, marginBottom: 6, color: inMonth ? '#111827' : '#94a3b8' }}>
+                      {d.getDate()}
+                    </div>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      {SHIFT_TYPES.map((shiftType) => {
+                        const cov = coverageMap.get(`${date}_${shiftType}`);
+                        const mine = isMine(date, shiftType);
+                        return (
+                          <div
+                            key={shiftType}
+                            style={{
+                              border: mine ? '1px solid #5b63f6' : '1px solid #dbe2f0',
+                              borderRadius: 8,
+                              padding: '2px 6px',
+                              fontSize: '0.72rem',
+                              background: mine ? 'rgba(91,99,246,0.12)' : '#f8fafc',
+                              color: mine ? '#404ad8' : '#334155',
+                            }}
+                          >
+                            {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {viewMode === 'week' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+              {weekDays.map((d) => {
+                const date = toIsoDate(d);
+                const active = date === selectedDate;
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    onClick={() => onPickDate(date)}
+                    style={{
+                      borderRadius: 0,
+                      border: '1px solid #eef2f7',
+                      borderLeft: 'none',
+                      borderTop: 'none',
+                      background: active ? '#eef2ff' : 'white',
+                      color: '#0f172a',
+                      textAlign: 'left',
+                      padding: '0.6rem',
+                      minHeight: 160,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                      {d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </div>
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {SHIFT_TYPES.map((shiftType) => {
+                        const cov = coverageMap.get(`${date}_${shiftType}`);
+                        const mine = isMine(date, shiftType);
+                        return (
+                          <div
+                            key={shiftType}
+                            style={{
+                              border: mine ? '1px solid #5b63f6' : '1px solid #dbe2f0',
+                              borderRadius: 8,
+                              padding: '4px 7px',
+                              fontSize: '0.76rem',
+                              background: mine ? 'rgba(91,99,246,0.12)' : '#f8fafc',
+                              color: mine ? '#404ad8' : '#334155',
+                            }}
+                          >
+                            {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {viewMode === 'day' && (
+            <div style={{ padding: '0.9rem', display: 'grid', gap: 10 }}>
+              {SHIFT_TYPES.map((shiftType) => {
+                const key = `${selectedDate}_${shiftType}`;
+                const cov = coverageMap.get(key);
+                const mine = isMine(selectedDate, shiftType);
+                return (
+                  <div key={shiftType} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.7rem' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>{shiftType}</div>
+                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>
+                      Team: {cov?.radiologistCount || 0} radiologists • Capacity: {cov?.totalMaxRvu || 0} RVU
+                    </div>
+                    <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {(cov?.radiologists || []).map((r) => (
+                        <span
+                          key={r.id}
                           style={{
-                            border: mine ? '1px solid #5b63f6' : '1px solid #dbe2f0',
-                            borderRadius: 8,
-                            padding: '2px 6px',
-                            fontSize: '0.72rem',
-                            background: mine ? 'rgba(91,99,246,0.12)' : '#f8fafc',
-                            color: mine ? '#404ad8' : '#334155',
+                            border: '1px solid #dbe2f0',
+                            borderRadius: 999,
+                            padding: '2px 8px',
+                            fontSize: '0.75rem',
+                            background: '#f8fafc',
                           }}
                         >
-                          {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU
-                        </div>
-                      );
-                    })}
+                          {r.name}
+                          {r.maxRvu != null ? ` (${r.maxRvu})` : ''}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </button>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: '0.9rem' }}>
