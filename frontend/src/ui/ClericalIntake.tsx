@@ -583,7 +583,7 @@ export const ClericalIntake: React.FC = () => {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                         gap: '0.35rem 1rem',
                         alignItems: 'start',
                       }}
@@ -594,9 +594,10 @@ export const ClericalIntake: React.FC = () => {
                           <label
                             key={opt}
                             style={{
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: 8,
+                              display: 'grid',
+                              gridTemplateColumns: '16px 1fr',
+                              alignItems: 'start',
+                              columnGap: 10,
                               padding: '0.4rem 0.25rem',
                               cursor: 'pointer',
                               fontSize: '0.875rem',
@@ -612,7 +613,7 @@ export const ClericalIntake: React.FC = () => {
                                   checked ? prev.filter((s) => s !== opt) : [...prev, opt]
                                 )
                               }
-                              style={{ margin: '2px 0 0', flexShrink: 0 }}
+                              style={{ margin: '2px 0 0' }}
                             />
                             <span>{opt}</span>
                           </label>
@@ -626,7 +627,7 @@ export const ClericalIntake: React.FC = () => {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                           gap: '0.35rem 1rem',
                           alignItems: 'start',
                         }}
@@ -637,9 +638,10 @@ export const ClericalIntake: React.FC = () => {
                             <label
                               key={seq}
                               style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: 8,
+                                display: 'grid',
+                                gridTemplateColumns: '16px 1fr',
+                                alignItems: 'start',
+                                columnGap: 10,
                                 padding: '0.4rem 0.25rem',
                                 cursor: 'pointer',
                                 fontSize: '0.875rem',
@@ -655,7 +657,7 @@ export const ClericalIntake: React.FC = () => {
                                     checked ? prev.filter((s) => s !== seq) : [...prev, seq]
                                   )
                                 }
-                                style={{ margin: '2px 0 0', flexShrink: 0 }}
+                                style={{ margin: '2px 0 0' }}
                               />
                               <span>{seq}</span>
                             </label>
