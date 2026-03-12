@@ -59,13 +59,14 @@ export const RequisitionsAdmin: React.FC = () => {
     Record<number, { modality: string; categoryId: number | null; selectedSubCategories: string[] }>
   >({});
   const [localNotes, setLocalNotes] = useState<Record<number, string>>({});
+  const [subCategoryDraft, setSubCategoryDraft] = useState<Record<number, string>>({});
 
   const resolveCategoryModality = (modality: string) => {
     if (modality === 'PET' || modality === 'X-ray') return 'Other';
     return modality;
   };
 
-  const getRowImaging = (r: RequisitionSummary) => {
+  const buildRowImagingFromData = (r: RequisitionSummary) => {
     const item = r.imagingItems?.[0];
     const inferredCategory =
       item?.categoryId != null ? categories.find((c) => c.id === item.categoryId) : undefined;
@@ -78,13 +79,15 @@ export const RequisitionsAdmin: React.FC = () => {
           : 'Other'
         : inferredCategory.modality
       : '';
-    return (
-      localImaging[r.id] || {
-        modality: modalityForUi(item) || inferredModality,
-        categoryId: item?.categoryId ?? null,
-        selectedSubCategories: parseSubCategoriesFromNotes(item?.specialNotes),
-      }
-    );
+    return {
+      modality: modalityForUi(item) || inferredModality,
+      categoryId: item?.categoryId ?? null,
+      selectedSubCategories: parseSubCategoriesFromNotes(item?.specialNotes),
+    };
+  };
+
+  const getRowImaging = (r: RequisitionSummary) => {
+    return localImaging[r.id] || buildRowImagingFromData(r);
   };
 
   const refresh = () => {
@@ -280,6 +283,49 @@ export const RequisitionsAdmin: React.FC = () => {
     return Array.from(new Set([...dynamic, ...selected]));
   };
 
+  const toggleSubCategory = (rowId: number, value: string) => {
+    setLocalImaging((prev) => {
+      const row = rows.find((r) => r.id === rowId);
+      const base =
+        prev[rowId] ||
+        (row
+          ? buildRowImagingFromData(row)
+          : { modality: '', categoryId: null, selectedSubCategories: [] });
+      const exists = base.selectedSubCategories.includes(value);
+      return {
+        ...prev,
+        [rowId]: {
+          ...base,
+          selectedSubCategories: exists
+            ? base.selectedSubCategories.filter((s) => s !== value)
+            : [...base.selectedSubCategories, value],
+        },
+      };
+    });
+  };
+
+  const addCustomSubCategory = (rowId: number) => {
+    const draft = (subCategoryDraft[rowId] || '').trim();
+    if (!draft) return;
+    setLocalImaging((prev) => {
+      const row = rows.find((r) => r.id === rowId);
+      const base =
+        prev[rowId] ||
+        (row
+          ? buildRowImagingFromData(row)
+          : { modality: '', categoryId: null, selectedSubCategories: [] });
+      if (base.selectedSubCategories.includes(draft)) return prev;
+      return {
+        ...prev,
+        [rowId]: {
+          ...base,
+          selectedSubCategories: [...base.selectedSubCategories, draft],
+        },
+      };
+    });
+    setSubCategoryDraft((prev) => ({ ...prev, [rowId]: '' }));
+  };
+
   return (
     <section style={{ maxWidth: 1120, margin: '0 auto' }}>
       <h3 style={{ marginTop: 0 }}>All requisitions</h3>
@@ -383,24 +429,59 @@ export const RequisitionsAdmin: React.FC = () => {
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     {r.status === 'pending_approval' ? (
-                      <select
-                        multiple
-                        size={3}
-                        value={getRowImaging(r).selectedSubCategories ?? []}
-                        onChange={(e) => {
-                          const values = Array.from(e.target.selectedOptions).map((o) => o.value);
-                          setLocalImaging((prev) => ({
-                            ...prev,
-                            [r.id]: { ...prev[r.id], selectedSubCategories: values },
-                          }));
-                        }}
-                      >
-                        {getSubCategoryOptionsForRow(r.id).map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ minWidth: 260 }}>
+                        <div
+                          style={{
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 6,
+                            padding: '0.4rem',
+                            maxHeight: 120,
+                            overflowY: 'auto',
+                            display: 'grid',
+                            gap: 4,
+                          }}
+                        >
+                          {getSubCategoryOptionsForRow(r.id).length === 0 ? (
+                            <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
+                              No predefined options for this category.
+                            </span>
+                          ) : (
+                            getSubCategoryOptionsForRow(r.id).map((s) => (
+                              <label
+                                key={s}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={getRowImaging(r).selectedSubCategories.includes(s)}
+                                  onChange={() => toggleSubCategory(r.id, s)}
+                                />
+                                <span>{s}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                          <input
+                            type="text"
+                            placeholder="Add custom subcategory"
+                            value={subCategoryDraft[r.id] || ''}
+                            onChange={(e) =>
+                              setSubCategoryDraft((prev) => ({ ...prev, [r.id]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addCustomSubCategory(r.id);
+                              }
+                            }}
+                            style={{ flex: 1, minWidth: 0 }}
+                          />
+                          <button type="button" onClick={() => addCustomSubCategory(r.id)}>
+                            Add
+                          </button>
+                        </div>
+                      </div>
                     ) : (
                       parseSubCategoriesFromNotes(r.imagingItems?.[0]?.specialNotes).join(', ') || '—'
                     )}
