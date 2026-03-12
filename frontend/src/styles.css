@@ -137,4 +137,8 @@ td {
   .app-mobile-menu-btn {
     display: inline-block !important;
   }
+
+  .calendar-shell {
+    grid-template-columns: 1fr !important;
+  }
 }

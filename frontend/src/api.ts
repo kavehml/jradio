@@ -431,6 +431,14 @@ export interface ShiftDto {
   maxRvu: number | null;
 }
 
+export interface ShiftCoverageDto {
+  date: string;
+  shiftType: 'AM' | 'PM' | 'NIGHT';
+  radiologistCount: number;
+  totalMaxRvu: number;
+  radiologists: { id: number; name: string; maxRvu: number | null }[];
+}
+
 export async function getMyShifts(token: string, from: string, to: string) {
   const res = await fetch(`${getApiBase()}/api/shifts/mine?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -442,7 +450,7 @@ export async function getMyShifts(token: string, from: string, to: string) {
 
 export async function saveMyShift(
   token: string,
-  data: { date: string; shiftType: 'AM' | 'PM' | 'NIGHT'; site?: string }
+  data: { date: string; shiftType: 'AM' | 'PM' | 'NIGHT'; site?: string; maxRvu?: number | null }
 ) {
   const res = await fetch(`${getApiBase()}/api/shifts/mine`, {
     method: 'POST',
@@ -457,6 +465,18 @@ export async function saveMyShift(
     throw new Error((err as { error?: string }).error || 'Failed to save shift');
   }
   return res.json() as Promise<ShiftDto>;
+}
+
+export async function getShiftCoverage(token: string, from: string, to: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/shifts/coverage?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!res.ok) throw new Error('Failed to load shift coverage');
+  const json = (await res.json()) as { coverage: ShiftCoverageDto[] };
+  return json.coverage;
 }
 
 export async function deleteMyShift(

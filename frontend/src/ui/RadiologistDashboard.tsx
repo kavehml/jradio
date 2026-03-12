@@ -1,40 +1,85 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  deleteMyShift,
+  getMyShifts,
+  getShiftCoverage,
+  saveMyShift,
+  ShiftCoverageDto,
+  ShiftDto,
+} from '../api';
 import { useAuth } from '../auth/AuthContext';
-import { deleteMyShift, getMyShifts, saveMyShift, ShiftDto } from '../api';
 
 type ShiftType = 'AM' | 'PM' | 'NIGHT';
 
-function isoDate(d: Date) {
+const SHIFT_TYPES: ShiftType[] = ['AM', 'PM', 'NIGHT'];
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function toIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
+}
+
+function monthRange(anchor: Date) {
+  const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+  return { start, end };
+}
+
+function buildCalendarGrid(anchor: Date) {
+  const { start } = monthRange(anchor);
+  const gridStart = new Date(start);
+  gridStart.setDate(start.getDate() - start.getDay());
+  const days: Date[] = [];
+  for (let i = 0; i < 42; i += 1) {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    days.push(d);
+  }
+  return days;
 }
 
 export const RadiologistDashboard: React.FC = () => {
   const { token } = useAuth();
-  const [shifts, setShifts] = useState<ShiftDto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [monthAnchor, setMonthAnchor] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(() => toIsoDate(new Date()));
   const [defaultSite, setDefaultSite] = useState('General');
+  const [myShifts, setMyShifts] = useState<ShiftDto[]>([]);
+  const [coverage, setCoverage] = useState<ShiftCoverageDto[]>([]);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [localMaxRvu, setLocalMaxRvu] = useState<Record<string, string>>({});
 
-  const days = useMemo(() => {
-    const list: string[] = [];
-    const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      list.push(isoDate(d));
-    }
-    return list;
-  }, []);
+  const calendarDays = useMemo(() => buildCalendarGrid(monthAnchor), [monthAnchor]);
+  const { start, end } = useMemo(() => monthRange(monthAnchor), [monthAnchor]);
+  const from = toIsoDate(start);
+  const to = toIsoDate(end);
 
-  const from = days[0];
-  const to = days[days.length - 1];
+  const myShiftMap = useMemo(() => {
+    const map = new Map<string, ShiftDto>();
+    myShifts.forEach((s) => map.set(`${s.date}_${s.shiftType}`, s));
+    return map;
+  }, [myShifts]);
+
+  const coverageMap = useMemo(() => {
+    const map = new Map<string, ShiftCoverageDto>();
+    coverage.forEach((c) => map.set(`${c.date}_${c.shiftType}`, c));
+    return map;
+  }, [coverage]);
 
   const refresh = () => {
     if (!token) return;
     setLoading(true);
-    getMyShifts(token, from, to)
-      .then(setShifts)
+    setMessage(null);
+    Promise.all([getMyShifts(token, from, to), getShiftCoverage(token, from, to)])
+      .then(([mine, teamCoverage]) => {
+        setMyShifts(mine);
+        setCoverage(teamCoverage);
+        const seed: Record<string, string> = {};
+        mine.forEach((s) => {
+          seed[`${s.date}_${s.shiftType}`] = s.maxRvu != null ? String(s.maxRvu) : '';
+        });
+        setLocalMaxRvu(seed);
+      })
       .catch((e) => setMessage(e instanceof Error ? e.message : 'Failed to load shifts'))
       .finally(() => setLoading(false));
   };
@@ -43,19 +88,25 @@ export const RadiologistDashboard: React.FC = () => {
     refresh();
   }, [token, from, to]);
 
-  const hasShift = (date: string, shiftType: ShiftType) =>
-    shifts.some((s) => s.date === date && s.shiftType === shiftType);
+  const isMine = (date: string, shiftType: ShiftType) => myShiftMap.has(`${date}_${shiftType}`);
 
-  const onToggle = async (date: string, shiftType: ShiftType) => {
+  const toggleShift = async (date: string, shiftType: ShiftType) => {
     if (!token) return;
     const key = `${date}_${shiftType}`;
     setSavingKey(key);
     setMessage(null);
     try {
-      if (hasShift(date, shiftType)) {
+      if (isMine(date, shiftType)) {
         await deleteMyShift(token, { date, shiftType });
       } else {
-        await saveMyShift(token, { date, shiftType, site: defaultSite || 'General' });
+        const rawMax = localMaxRvu[key];
+        const maxRvu = rawMax && Number.isFinite(Number(rawMax)) ? Number(rawMax) : null;
+        await saveMyShift(token, {
+          date,
+          shiftType,
+          site: defaultSite || 'General',
+          maxRvu,
+        });
       }
       refresh();
     } catch (e) {
@@ -65,80 +116,172 @@ export const RadiologistDashboard: React.FC = () => {
     }
   };
 
+  const saveCapacity = async (date: string, shiftType: ShiftType) => {
+    if (!token) return;
+    const key = `${date}_${shiftType}`;
+    if (!isMine(date, shiftType)) return;
+    setSavingKey(`${key}_capacity`);
+    setMessage(null);
+    try {
+      const rawMax = localMaxRvu[key];
+      const maxRvu = rawMax && Number.isFinite(Number(rawMax)) ? Number(rawMax) : null;
+      await saveMyShift(token, { date, shiftType, site: defaultSite || 'General', maxRvu });
+      refresh();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Failed to update RVU capacity');
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const monthName = monthAnchor.toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
+
   return (
-    <section style={{ maxWidth: 1040, margin: '0 auto' }}>
-      <h2>Radiologist shift calendar</h2>
-      <p style={{ color: '#4b5563', marginBottom: '1rem' }}>
-        Book your AM, PM, and Night shifts for the next 14 days.
-      </p>
-      <div
-        style={{
-          background: 'white',
-          padding: '1rem',
-          borderRadius: 8,
-          boxShadow: '0 1px 3px rgba(15,23,42,0.1)',
-          marginBottom: '1rem',
-          display: 'flex',
-          gap: 10,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>Default site:</span>
-          <input value={defaultSite} onChange={(e) => setDefaultSite(e.target.value)} />
-        </label>
-        {message && <span style={{ color: '#b91c1c' }}>{message}</span>}
+    <section style={{ maxWidth: 1320, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ marginBottom: 4 }}>Radiologist Shift Calendar</h2>
+          <p style={{ margin: 0, color: '#64748b' }}>
+            Calendar-style booking with team coverage and RVU capacity per shift.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => setMonthAnchor((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>
+            Previous
+          </button>
+          <strong style={{ minWidth: 160, textAlign: 'center' }}>{monthName}</strong>
+          <button type="button" onClick={() => setMonthAnchor((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>
+            Next
+          </button>
+        </div>
       </div>
-      <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
-        {loading ? (
-          <p>Loading shifts…</p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.92rem' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Date</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>AM</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>PM</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Night</th>
-                </tr>
-              </thead>
-              <tbody>
-                {days.map((date) => (
-                  <tr key={date}>
-                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-                      {new Date(date).toLocaleDateString()}
-                    </td>
-                    {(['AM', 'PM', 'NIGHT'] as ShiftType[]).map((shiftType) => {
-                      const selected = hasShift(date, shiftType);
-                      const key = `${date}_${shiftType}`;
+
+      <div className="calendar-shell" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, marginTop: 14 }}>
+        <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e2e8f0' }}>
+            {WEEKDAY_LABELS.map((label) => (
+              <div key={label} style={{ padding: '0.6rem', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '0.84rem' }}>
+                {label}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+            {calendarDays.map((d) => {
+              const date = toIsoDate(d);
+              const inMonth = d.getMonth() === monthAnchor.getMonth();
+              const active = date === selectedDate;
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => setSelectedDate(date)}
+                  style={{
+                    borderRadius: 0,
+                    border: '1px solid #eef2f7',
+                    borderLeft: 'none',
+                    borderTop: 'none',
+                    background: active ? '#eef2ff' : inMonth ? 'white' : '#f8fafc',
+                    color: '#0f172a',
+                    textAlign: 'left',
+                    padding: '0.5rem',
+                    minHeight: 118,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 6, color: inMonth ? '#111827' : '#94a3b8' }}>
+                    {d.getDate()}
+                  </div>
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    {SHIFT_TYPES.map((shiftType) => {
+                      const cov = coverageMap.get(`${date}_${shiftType}`);
+                      const mine = isMine(date, shiftType);
                       return (
-                        <td key={shiftType} style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-                          <button
-                            type="button"
-                            disabled={savingKey === key}
-                            onClick={() => void onToggle(date, shiftType)}
-                            style={{
-                              padding: '0.3rem 0.75rem',
-                              borderRadius: 6,
-                              cursor: 'pointer',
-                              border: selected ? '1px solid #3b82f6' : '1px solid #cbd5e1',
-                              background: selected ? '#eff6ff' : 'white',
-                            }}
-                          >
-                            {savingKey === key ? 'Saving…' : selected ? 'Booked' : 'Book'}
-                          </button>
-                        </td>
+                        <div
+                          key={shiftType}
+                          style={{
+                            border: mine ? '1px solid #5b63f6' : '1px solid #dbe2f0',
+                            borderRadius: 8,
+                            padding: '2px 6px',
+                            fontSize: '0.72rem',
+                            background: mine ? 'rgba(91,99,246,0.12)' : '#f8fafc',
+                            color: mine ? '#404ad8' : '#334155',
+                          }}
+                        >
+                          {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU
+                        </div>
                       );
                     })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
+
+        <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: '0.9rem' }}>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>
+            {new Date(selectedDate).toLocaleDateString(undefined, {
+              weekday: 'long',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+          </h3>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Default Site</span>
+            <input value={defaultSite} onChange={(e) => setDefaultSite(e.target.value)} />
+          </label>
+          {message && (
+            <div style={{ marginBottom: 10, color: '#b91c1c', fontSize: '0.85rem' }}>
+              {message}
+            </div>
+          )}
+          <div style={{ display: 'grid', gap: 10 }}>
+            {SHIFT_TYPES.map((shiftType) => {
+              const key = `${selectedDate}_${shiftType}`;
+              const mine = isMine(selectedDate, shiftType);
+              const cov = coverageMap.get(key);
+              return (
+                <div key={shiftType} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.7rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <strong>{shiftType}</strong>
+                    <button
+                      type="button"
+                      disabled={savingKey === key}
+                      onClick={() => void toggleShift(selectedDate, shiftType)}
+                    >
+                      {savingKey === key ? 'Saving...' : mine ? 'Remove me' : 'Book me'}
+                    </button>
+                  </div>
+                  <div style={{ marginTop: 6, color: '#64748b', fontSize: '0.82rem' }}>
+                    Team: {cov?.radiologistCount || 0} radiologists • Capacity: {cov?.totalMaxRvu || 0} RVU
+                  </div>
+                  <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="My max RVU for this shift"
+                      value={localMaxRvu[key] ?? ''}
+                      onChange={(e) => setLocalMaxRvu((prev) => ({ ...prev, [key]: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      disabled={!mine || savingKey === `${key}_capacity`}
+                      onClick={() => void saveCapacity(selectedDate, shiftType)}
+                    >
+                      {savingKey === `${key}_capacity` ? 'Saving...' : 'Save RVU'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
+
+      {loading && <p style={{ color: '#64748b' }}>Loading shifts...</p>}
     </section>
   );
 };

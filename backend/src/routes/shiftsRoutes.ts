@@ -33,7 +33,12 @@ router.get('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (r
 });
 
 router.post('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (req: AuthRequest, res) => {
-  const { date, shiftType, site } = req.body as { date?: string; shiftType?: ShiftType; site?: string };
+  const { date, shiftType, site, maxRvu } = req.body as {
+    date?: string;
+    shiftType?: ShiftType;
+    site?: string;
+    maxRvu?: number | null;
+  };
   if (!date || !shiftType) {
     return res.status(400).json({ error: 'date and shiftType are required' });
   }
@@ -46,6 +51,9 @@ router.post('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (
     });
     if (existing) {
       existing.site = site || existing.site || 'General';
+      if (maxRvu !== undefined) {
+        existing.maxRvu = maxRvu;
+      }
       await existing.save();
       return res.json(existing);
     }
@@ -54,7 +62,7 @@ router.post('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (
       date: new Date(date),
       shiftType,
       site: site || 'General',
-      maxRvu: null,
+      maxRvu: maxRvu ?? null,
     });
     return res.status(201).json(created);
   } catch (err) {
@@ -92,6 +100,55 @@ router.get('/summary', requireAuth, requireRole(['admin']), async (req, res) => 
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load shift summary' });
+  }
+});
+
+router.get('/coverage', requireAuth, requireRole(['radiologist', 'admin']), async (req, res) => {
+  const { from, to } = getRange(req.query as { from?: string; to?: string });
+  try {
+    const shifts = await ShiftAssignment.findAll({
+      where: { date: { [Op.between]: [from, to] } },
+      include: [{ model: User, as: 'radiologist', attributes: ['id', 'name'] }],
+      order: [['date', 'ASC'], ['shiftType', 'ASC']],
+      attributes: ['id', 'date', 'shiftType', 'site', 'maxRvu', 'radiologistId'],
+    });
+
+    const grouped: Record<
+      string,
+      {
+        date: string;
+        shiftType: ShiftType;
+        radiologistCount: number;
+        totalMaxRvu: number;
+        radiologists: { id: number; name: string; maxRvu: number | null }[];
+      }
+    > = {};
+
+    shifts.forEach((s) => {
+      const date = String(s.date);
+      const key = `${date}_${s.shiftType}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          date,
+          shiftType: s.shiftType,
+          radiologistCount: 0,
+          totalMaxRvu: 0,
+          radiologists: [],
+        };
+      }
+      grouped[key].radiologistCount += 1;
+      grouped[key].totalMaxRvu += s.maxRvu || 0;
+      grouped[key].radiologists.push({
+        id: s.radiologistId,
+        name: ((s as unknown as { radiologist?: { name?: string } }).radiologist?.name || 'Radiologist'),
+        maxRvu: s.maxRvu,
+      });
+    });
+
+    return res.json({ coverage: Object.values(grouped) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load shift coverage' });
   }
 });
 
