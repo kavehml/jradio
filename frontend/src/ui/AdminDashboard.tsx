@@ -219,7 +219,7 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <section style={{ maxWidth: 1024, margin: '0 auto' }}>
-      <h2>Admin portal</h2>
+      <h2>Setting</h2>
       <p style={{ color: '#4b5563', marginBottom: '1rem' }}>
         Add radiologists, clerical staff, or other admins. Manage shifts and requisitions from here.
       </p>

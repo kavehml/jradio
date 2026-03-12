@@ -22,12 +22,12 @@ export const AppLayout: React.FC = () => {
   const canSeeRadiologist = true;
 
   const navLinks = [
-    canSeeRadiologist ? { to: '/radiologist', label: 'Radiologist portal', key: 'radiologist' } : null,
+    canSeeRadiologist ? { to: '/radiologist', label: 'Radiologist calendar', key: 'radiologist' } : null,
     canSeeClerical ? { to: '/clerical', label: 'Clerical intake', key: 'clerical' } : null,
     canSeeRequisitions ? { to: '/requisitions', label: 'Requisitions', key: 'requisitions' } : null,
     canSeeAssigning ? { to: '/assigning', label: 'Assigning', key: 'assigning' } : null,
     canSeeServiceRules ? { to: '/service-rules', label: 'Service rules', key: 'service-rules' } : null,
-    canSeeAdmin ? { to: '/admin', label: 'Admin portal', key: 'admin' } : null,
+    canSeeAdmin ? { to: '/admin', label: 'Setting', key: 'admin' } : null,
   ].filter((x): x is { to: string; label: string; key: string } => Boolean(x));
 
   return (
