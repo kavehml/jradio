@@ -561,6 +561,7 @@ export const ClericalIntake: React.FC = () => {
                       border: '2px solid ' + (selectedCategory?.id === cat.id ? '#3b82f6' : '#e2e8f0'),
                       borderRadius: 8,
                       background: selectedCategory?.id === cat.id ? '#eff6ff' : 'white',
+                      color: '#0f172a',
                       cursor: 'pointer',
                       textAlign: 'left',
                     }}
@@ -582,11 +583,9 @@ export const ClericalIntake: React.FC = () => {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                        gap: '0.35rem 1.5rem',
-                        columnGap: '1.5rem',
-                        rowGap: '0.35rem',
-                        alignItems: 'center',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                        gap: '0.35rem 1rem',
+                        alignItems: 'start',
                       }}
                     >
                       {getMergedSubCategoryOptions(selectedCategory).map((opt) => {
@@ -596,11 +595,12 @@ export const ClericalIntake: React.FC = () => {
                             key={opt}
                             style={{
                               display: 'flex',
-                              alignItems: 'center',
+                              alignItems: 'flex-start',
                               gap: 8,
-                              padding: '0.35rem 0',
+                              padding: '0.4rem 0.25rem',
                               cursor: 'pointer',
                               fontSize: '0.875rem',
+                              lineHeight: 1.25,
                               borderBottom: '1px solid #f1f5f9',
                             }}
                           >
@@ -612,7 +612,7 @@ export const ClericalIntake: React.FC = () => {
                                   checked ? prev.filter((s) => s !== opt) : [...prev, opt]
                                 )
                               }
-                              style={{ margin: 0, flexShrink: 0 }}
+                              style={{ margin: '2px 0 0', flexShrink: 0 }}
                             />
                             <span>{opt}</span>
                           </label>
@@ -626,10 +626,9 @@ export const ClericalIntake: React.FC = () => {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                          columnGap: '1.5rem',
-                          rowGap: '0.35rem',
-                          alignItems: 'center',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                          gap: '0.35rem 1rem',
+                          alignItems: 'start',
                         }}
                       >
                         {getMriSequenceOptions(selectedCategory).map((seq) => {
@@ -639,11 +638,12 @@ export const ClericalIntake: React.FC = () => {
                               key={seq}
                               style={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: 'flex-start',
                                 gap: 8,
-                                padding: '0.35rem 0',
+                                padding: '0.4rem 0.25rem',
                                 cursor: 'pointer',
                                 fontSize: '0.875rem',
+                                lineHeight: 1.25,
                                 borderBottom: '1px solid #f1f5f9',
                               }}
                             >
@@ -655,7 +655,7 @@ export const ClericalIntake: React.FC = () => {
                                     checked ? prev.filter((s) => s !== seq) : [...prev, seq]
                                   )
                                 }
-                                style={{ margin: 0, flexShrink: 0 }}
+                                style={{ margin: '2px 0 0', flexShrink: 0 }}
                               />
                               <span>{seq}</span>
                             </label>
