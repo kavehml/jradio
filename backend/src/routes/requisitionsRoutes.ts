@@ -15,13 +15,62 @@ function computeRvuForImaging(bodyParts: string[], modality: string): number {
   return 2;
 }
 
-function mergeExamNotes(selectedSubCategories: string[], notes?: string | null): string | null {
-  const stripped = (notes || '')
-    .replace(/Exams:\s*([^·]+)(\s*·\s*)?/gi, '')
-    .replace(/\s*·\s*$/g, '')
+function parseSubCategoriesFromNotes(notes?: string | null): string[] {
+  if (!notes) return [];
+
+  const lines = notes.split(/\r?\n/);
+  const examsIndex = lines.findIndex((l) => /^Exams:/i.test(l.trim()));
+  if (examsIndex >= 0) {
+    const values: string[] = [];
+    const firstLineRemainder = (lines[examsIndex] ?? '').replace(/^Exams:\s*/i, '').trim();
+    if (firstLineRemainder && !firstLineRemainder.startsWith('-')) {
+      values.push(
+        ...firstLineRemainder
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      );
+    }
+    for (let i = examsIndex + 1; i < lines.length; i += 1) {
+      const line = (lines[i] ?? '').trim();
+      if (!line) continue;
+      if (line.startsWith('- ')) {
+        const value = line.slice(2).trim();
+        if (value) values.push(value);
+        continue;
+      }
+      break;
+    }
+    if (values.length) return Array.from(new Set(values));
+  }
+
+  const legacyMatch = notes.match(/Exams:\s*([^·\n]+)/i);
+  if (!legacyMatch?.[1]) return [];
+  return Array.from(
+    new Set(
+      legacyMatch[1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function stripManagedPrefixes(notes?: string | null): string {
+  if (!notes) return '';
+  const withoutExamHeader = notes.replace(/Exams:\s*([^\n]*)(\n|$)/gi, '');
+  const withoutExamBullets = withoutExamHeader.replace(/^\s*-\s+.*$/gim, '');
+  return withoutExamBullets
+    .replace(/^Notes:\s*/i, '')
+    .replace(/^\s*·\s*/g, '')
     .trim();
+}
+
+function mergeExamNotes(selectedSubCategories: string[], notes?: string | null): string | null {
+  const stripped = stripManagedPrefixes(notes);
   if (!selectedSubCategories.length) return stripped || null;
-  return `Exams: ${selectedSubCategories.join(', ')}${stripped ? ` · ${stripped}` : ''}`;
+  const examBlock = `Exams:\n${selectedSubCategories.map((s) => `- ${s}`).join('\n')}`;
+  return stripped ? `${examBlock}\nNotes: ${stripped}` : examBlock;
 }
 
 function validateAndBuildParams(body: {
@@ -352,11 +401,7 @@ router.patch('/:id/notes', requireAuth, requireRole(['admin', 'radiologist', 'cl
         categoryId: null,
       });
     } else {
-      const examMatch = (item.specialNotes || '').match(/Exams:\s*([^·]+)/i);
-      const exams = examMatch?.[1]
-        ?.split(',')
-        .map((s) => s.trim())
-        .filter(Boolean) || [];
+      const exams = parseSubCategoriesFromNotes(item.specialNotes);
       item.specialNotes = mergeExamNotes(exams, notes?.trim() || null);
       await item.save();
     }

@@ -23,12 +23,54 @@ interface Category {
 
 function parseSubCategoriesFromNotes(notes?: string | null): string[] {
   if (!notes) return [];
-  const match = notes.match(/Exams:\s*([^·]+)/i);
-  if (!match?.[1]) return [];
-  return match[1]
+  const lines = notes.split(/\r?\n/);
+  const examsIndex = lines.findIndex((l) => /^Exams:/i.test(l.trim()));
+  if (examsIndex >= 0) {
+    const values: string[] = [];
+    const firstLineRemainder = lines[examsIndex].replace(/^Exams:\s*/i, '').trim();
+    if (firstLineRemainder && !firstLineRemainder.startsWith('-')) {
+      values.push(
+        ...firstLineRemainder
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      );
+    }
+    for (let i = examsIndex + 1; i < lines.length; i += 1) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      if (line.startsWith('- ')) {
+        const value = line.slice(2).trim();
+        if (value) values.push(value);
+        continue;
+      }
+      break;
+    }
+    if (values.length) return Array.from(new Set(values));
+  }
+
+  const legacy = notes.match(/Exams:\s*([^·\n]+)/i);
+  if (!legacy?.[1]) return [];
+  return legacy[1]
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function parseAdditionalNotes(notes?: string | null): string {
+  if (!notes) return '';
+  const lines = notes.split(/\r?\n/);
+  const notesIndex = lines.findIndex((l) => /^Notes:/i.test(l.trim()));
+  if (notesIndex >= 0) {
+    const first = lines[notesIndex].replace(/^Notes:\s*/i, '').trim();
+    const rest = lines.slice(notesIndex + 1).join('\n').trim();
+    return [first, rest].filter(Boolean).join('\n').trim();
+  }
+  return notes
+    .replace(/Exams:\s*([^\n]*)(\n|$)/gi, '')
+    .replace(/^\s*-\s+.*$/gim, '')
+    .replace(/^\s*·\s*/g, '')
+    .trim();
 }
 
 function modalityForUi(item?: {
@@ -143,7 +185,7 @@ export const RequisitionsAdmin: React.FC = () => {
         categoryId: item?.categoryId ?? null,
         selectedSubCategories: parseSubCategoriesFromNotes(item?.specialNotes),
       };
-      notesMap[r.id] = item?.specialNotes || '';
+      notesMap[r.id] = parseAdditionalNotes(item?.specialNotes);
     });
     setLocalRows(map);
     setLocalImaging(imagingMap);
