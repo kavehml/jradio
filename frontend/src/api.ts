@@ -349,6 +349,33 @@ export interface RequisitionSummary {
   specialtyRequirement?: { requiredSubspecialties: string[] } | null;
 }
 
+export interface BulkRequisitionCreateInput {
+  patientIdOrTempLabel: string;
+  patientName?: string;
+  patientDateOfBirth?: string;
+  isNewExternalPatient: boolean;
+  orderingDoctorName: string;
+  orderingClinic: string;
+  site: string;
+  dateOfRequest?: string;
+  timeDelayPreset?: string;
+  hasImagingWithin24h?: boolean;
+  categoryId: number;
+  modality: string;
+  bodyParts: string[];
+  withContrast?: boolean;
+  notes?: string;
+  selectedSubCategories?: string[];
+}
+
+export interface BulkRequisitionCreateResult {
+  total: number;
+  createdCount: number;
+  failedCount: number;
+  created: Array<{ index: number; id: number; visitNumber: string }>;
+  errors: Array<{ index: number; error: string }>;
+}
+
 export interface SpecialtyRuleDto {
   id: number;
   modality: string;
@@ -364,6 +391,28 @@ export async function getRequisitions(token: string) {
   if (!res.ok) throw new Error('Failed to load requisitions');
   const json = (await res.json()) as { requisitions: RequisitionSummary[] };
   return json.requisitions;
+}
+
+export async function createRequisitionsBulk(
+  token: string,
+  requisitions: BulkRequisitionCreateInput[]
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/bulk`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ requisitions }),
+  });
+
+  const payload = (await res.json().catch(() => ({}))) as Partial<BulkRequisitionCreateResult> & {
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(payload.error || 'Failed to import requisitions');
+  }
+  return payload as BulkRequisitionCreateResult;
 }
 
 export async function updateRequisitionSchedule(

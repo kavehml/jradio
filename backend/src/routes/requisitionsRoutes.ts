@@ -201,6 +201,66 @@ router.post('/public', async (req, res) => {
   }
 });
 
+// Bulk requisition creation for admin/clerical uploads
+router.post('/bulk', requireAuth, requireRole(['admin', 'clerical']), async (req, res) => {
+  const body = req.body as {
+    requisitions?: Array<{
+      patientIdOrTempLabel?: string;
+      patientName?: string;
+      patientDateOfBirth?: string;
+      isNewExternalPatient?: boolean;
+      orderingDoctorName?: string;
+      orderingClinic?: string;
+      site?: string;
+      dateOfRequest?: string;
+      timeDelayPreset?: string;
+      hasImagingWithin24h?: boolean;
+      categoryId?: number;
+      modality?: string;
+      bodyParts?: string[];
+      withContrast?: boolean;
+      notes?: string;
+      selectedSubCategories?: string[];
+    }>;
+  };
+
+  const entries = Array.isArray(body.requisitions) ? body.requisitions : [];
+  if (!entries.length) {
+    return res.status(400).json({ error: 'requisitions array is required' });
+  }
+  if (entries.length > 500) {
+    return res.status(400).json({ error: 'Maximum 500 requisitions per upload' });
+  }
+
+  const created: Array<{ index: number; id: number; visitNumber: string }> = [];
+  const errors: Array<{ index: number; error: string }> = [];
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i];
+    const validated = validateAndBuildParams(entry || {});
+    if ('error' in validated) {
+      errors.push({ index: i + 1, error: validated.error });
+      continue;
+    }
+
+    try {
+      const result = await createRequisition(validated.params);
+      created.push({ index: i + 1, id: result.id, visitNumber: result.visitNumber });
+    } catch (err) {
+      console.error(err);
+      errors.push({ index: i + 1, error: 'Failed to create requisition' });
+    }
+  }
+
+  return res.status(created.length ? 201 : 400).json({
+    total: entries.length,
+    createdCount: created.length,
+    failedCount: errors.length,
+    created,
+    errors,
+  });
+});
+
 // List requisitions for admins/clerical
 router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, res) => {
   try {

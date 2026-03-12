@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../auth/AuthContext';
 import {
   approveRequisition,
+  createRequisitionsBulk,
   deleteRequisition,
   getImagingCategories,
   getImagingSubCategories,
   getRequisitions,
+  BulkRequisitionCreateInput,
   RequisitionSummary,
   updateRequisitionImaging,
   updateRequisitionNotes,
@@ -102,10 +105,267 @@ export const RequisitionsAdmin: React.FC = () => {
   >({});
   const [localNotes, setLocalNotes] = useState<Record<number, string>>({});
   const [subCategoryDraft, setSubCategoryDraft] = useState<Record<number, string>>({});
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [importFailed, setImportFailed] = useState(false);
 
   const resolveCategoryModality = (modality: string) => {
     if (modality === 'PET' || modality === 'X-ray') return 'Other';
     return modality;
+  };
+
+  const normalizeText = (value: unknown) =>
+    String(value ?? '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+
+  const normalizeModality = (value: unknown) => {
+    const normalized = normalizeText(value);
+    if (normalized === 'xray' || normalized === 'x-ray') return 'x-ray';
+    return normalized;
+  };
+
+  const categoryModalityForUi = (category: Category): string => {
+    if (category.modality === 'Other') {
+      const upper = category.name.toUpperCase();
+      if (upper.startsWith('PET ')) return 'PET';
+      if (upper.startsWith('XR ')) return 'X-ray';
+    }
+    return category.modality;
+  };
+
+  const mergeExamNotesForCreate = (selectedSubCategories: string[], notes?: string) => {
+    const cleanNotes = (notes || '').trim();
+    if (!selectedSubCategories.length) return cleanNotes || undefined;
+    const examBlock = `Exams:\n${selectedSubCategories.map((s) => `- ${s}`).join('\n')}`;
+    return cleanNotes ? `${examBlock}\nNotes: ${cleanNotes}` : examBlock;
+  };
+
+  const downloadExcelTemplate = () => {
+    const sampleRows = [
+      {
+        patientIdOrTempLabel: 'MRN-001',
+        patientName: 'Jane Doe',
+        patientDateOfBirth: '1985-08-17',
+        isNewExternalPatient: 'FALSE',
+        orderingDoctorName: 'Dr. Smith',
+        orderingClinic: 'Downtown Clinic',
+        site: 'Jewish General Hospital',
+        dateOfRequest: '2026-03-12',
+        timeDelayPreset: '24h',
+        hasImagingWithin24h: 'FALSE',
+        modality: 'CT',
+        categoryName: 'CT HEAD',
+        subCategories: 'CT Head C+|CT C1A1',
+        withContrast: 'FALSE',
+        notes: 'Clinical context here',
+      },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    const dataSheet = XLSX.utils.json_to_sheet(sampleRows);
+    XLSX.utils.book_append_sheet(workbook, dataSheet, 'Requisitions');
+
+    const helpRows = [
+      ['Field', 'Required', 'Expected format'],
+      ['patientIdOrTempLabel', 'Yes', 'Any identifier (MRN / temp label)'],
+      ['patientName', 'No', 'Patient full name'],
+      ['patientDateOfBirth', 'No', 'YYYY-MM-DD'],
+      ['isNewExternalPatient', 'No', 'TRUE or FALSE'],
+      ['orderingDoctorName', 'Yes', 'Ordering doctor name'],
+      ['orderingClinic', 'Yes', 'Clinic name'],
+      ['site', 'Yes', 'Site/location'],
+      ['dateOfRequest', 'No', 'YYYY-MM-DD'],
+      ['timeDelayPreset', 'No', 'Example: 24h, 7d, 30d, 3m'],
+      ['hasImagingWithin24h', 'No', 'TRUE or FALSE'],
+      ['modality', 'Yes', 'CT, MRI, US, PET, X-ray'],
+      ['categoryName', 'Yes', 'Must match existing category name exactly'],
+      ['subCategories', 'No', 'Separate multiple values with |'],
+      ['withContrast', 'No', 'TRUE or FALSE'],
+      ['notes', 'No', 'Additional notes'],
+    ];
+    const helpSheet = XLSX.utils.aoa_to_sheet(helpRows);
+    XLSX.utils.book_append_sheet(workbook, helpSheet, 'Instructions');
+
+    const categoryRows = categories
+      .map((c) => ({
+        modality: categoryModalityForUi(c),
+        categoryName: c.name,
+        bodyPart: c.bodyPart,
+      }))
+      .sort((a, b) =>
+        `${a.modality}-${a.categoryName}`.localeCompare(`${b.modality}-${b.categoryName}`)
+      );
+    const categoriesSheet = XLSX.utils.json_to_sheet(categoryRows);
+    XLSX.utils.book_append_sheet(workbook, categoriesSheet, 'Available Categories');
+
+    XLSX.writeFile(workbook, 'requisition-bulk-template.xlsx');
+  };
+
+  const handleImportExcel = async () => {
+    if (!token) return;
+    if (!importFile) {
+      setImportFailed(true);
+      setImportResult('Please choose an Excel file before importing.');
+      return;
+    }
+    if (!categories.length) {
+      setImportFailed(true);
+      setImportResult('Categories are still loading. Please wait and try again.');
+      return;
+    }
+
+    setImporting(true);
+    setImportResult(null);
+    setImportFailed(false);
+
+    try {
+      const buffer = await importFile.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheetName = workbook.SheetNames.includes('Requisitions')
+        ? 'Requisitions'
+        : workbook.SheetNames[0];
+      if (!sheetName) throw new Error('No worksheet found in uploaded file.');
+
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+      if (!rows.length) throw new Error('Uploaded sheet is empty.');
+
+      const rowErrors: string[] = [];
+      const payload: BulkRequisitionCreateInput[] = [];
+
+      rows.forEach((row: Record<string, unknown>, index: number) => {
+        const excelRowNumber = index + 2;
+        const keyMap = new Map<string, unknown>();
+        Object.entries(row).forEach(([k, v]) => {
+          keyMap.set(normalizeText(k), v);
+        });
+
+        const readValue = (...keys: string[]) => {
+          for (const key of keys) {
+            const value = keyMap.get(normalizeText(key));
+            if (value !== undefined && value !== null && String(value).trim() !== '') {
+              return String(value).trim();
+            }
+          }
+          return '';
+        };
+
+        const readBoolean = (...keys: string[]) => {
+          const raw = normalizeText(readValue(...keys));
+          if (!raw) return undefined;
+          return raw === 'true' || raw === 'yes' || raw === '1' || raw === 'y';
+        };
+
+        const parseSubCategories = (value: string) =>
+          value
+            .split(/[|,;\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+        const patientIdOrTempLabel = readValue('patientIdOrTempLabel', 'patientId', 'mrn');
+        const orderingDoctorName = readValue('orderingDoctorName', 'orderingDoctor', 'doctor');
+        const orderingClinic = readValue('orderingClinic', 'clinic');
+        const site = readValue('site', 'location');
+        const modality = readValue('modality');
+        const categoryName = readValue('categoryName', 'category');
+        const patientName = readValue('patientName');
+        const patientDateOfBirth = readValue('patientDateOfBirth', 'patientDob', 'dob');
+        const dateOfRequest = readValue('dateOfRequest');
+        const timeDelayPreset = readValue('timeDelayPreset', 'timeDelay');
+        const notes = readValue('notes');
+        const selectedSubCategories = parseSubCategories(readValue('subCategories', 'subcategories'));
+        const isNewExternalPatient = readBoolean('isNewExternalPatient') ?? false;
+        const hasImagingWithin24h = readBoolean('hasImagingWithin24h');
+        const withContrast = readBoolean('withContrast');
+
+        if (
+          !patientIdOrTempLabel ||
+          !orderingDoctorName ||
+          !orderingClinic ||
+          !site ||
+          !modality ||
+          !categoryName
+        ) {
+          rowErrors.push(
+            `Row ${excelRowNumber}: missing required fields (patientIdOrTempLabel, orderingDoctorName, orderingClinic, site, modality, categoryName).`
+          );
+          return;
+        }
+
+        const normalizedModality = normalizeModality(modality);
+        const normalizedCategoryName = normalizeText(categoryName);
+        const categoryMatches = categories.filter(
+          (c) =>
+            normalizeText(c.name) === normalizedCategoryName &&
+            normalizeModality(categoryModalityForUi(c)) === normalizedModality
+        );
+
+        if (!categoryMatches.length) {
+          rowErrors.push(
+            `Row ${excelRowNumber}: category "${categoryName}" with modality "${modality}" was not found.`
+          );
+          return;
+        }
+
+        const matchedCategory = categoryMatches[0];
+        payload.push({
+          patientIdOrTempLabel,
+          ...(patientName ? { patientName } : {}),
+          ...(patientDateOfBirth ? { patientDateOfBirth } : {}),
+          isNewExternalPatient,
+          orderingDoctorName,
+          orderingClinic,
+          site,
+          ...(dateOfRequest ? { dateOfRequest } : {}),
+          ...(timeDelayPreset ? { timeDelayPreset } : {}),
+          ...(hasImagingWithin24h !== undefined ? { hasImagingWithin24h } : {}),
+          modality: categoryModalityForUi(matchedCategory),
+          categoryId: matchedCategory.id,
+          bodyParts: [matchedCategory.bodyPart],
+          ...(withContrast !== undefined ? { withContrast } : {}),
+          ...(selectedSubCategories.length ? { selectedSubCategories } : {}),
+          ...(mergeExamNotesForCreate(selectedSubCategories, notes)
+            ? { notes: mergeExamNotesForCreate(selectedSubCategories, notes) }
+            : {}),
+        });
+      });
+
+      if (!payload.length) {
+        setImportFailed(true);
+        setImportResult(`No valid rows to import.\n${rowErrors.slice(0, 8).join('\n')}`);
+        return;
+      }
+
+      const result = await createRequisitionsBulk(token, payload);
+      refresh();
+
+      const combinedErrors = [
+        ...rowErrors,
+        ...result.errors.map((e) => `Server row ${e.index}: ${e.error}`),
+      ];
+      const successLine = `Imported ${result.createdCount}/${result.total} valid rows.`;
+      const skippedLine = rowErrors.length
+        ? `Skipped ${rowErrors.length} rows before upload (template/validation issues).`
+        : '';
+      const failedLine = result.failedCount
+        ? `Server failed ${result.failedCount} rows during creation.`
+        : '';
+      const errorPreview = combinedErrors.length
+        ? `\n${combinedErrors.slice(0, 8).join('\n')}${combinedErrors.length > 8 ? '\n...' : ''}`
+        : '';
+
+      setImportFailed(result.failedCount > 0 || rowErrors.length > 0);
+      setImportResult([successLine, skippedLine, failedLine].filter(Boolean).join(' ') + errorPreview);
+      setImportFile(null);
+    } catch (e) {
+      setImportFailed(true);
+      setImportResult(e instanceof Error ? e.message : 'Failed to import Excel file.');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const buildRowImagingFromData = (r: RequisitionSummary) => {
@@ -371,6 +631,55 @@ export const RequisitionsAdmin: React.FC = () => {
   return (
     <section style={{ maxWidth: 1120, margin: '0 auto' }}>
       <h3 style={{ marginTop: 0 }}>All requisitions</h3>
+      <div
+        style={{
+          marginBottom: '0.9rem',
+          padding: '0.75rem',
+          border: '1px solid #dbeafe',
+          borderRadius: 10,
+          background: '#f8fbff',
+          display: 'grid',
+          gap: '0.55rem',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <button type="button" onClick={downloadExcelTemplate}>
+            Download sample Excel
+          </button>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+            style={{ maxWidth: 320 }}
+          />
+          <button
+            type="button"
+            onClick={() => void handleImportExcel()}
+            disabled={importing || !importFile}
+          >
+            {importing ? 'Importing…' : 'Upload to requisitions'}
+          </button>
+        </div>
+        <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569' }}>
+          Use the template to add multiple requisitions in one upload.
+        </p>
+        {importResult && (
+          <pre
+            style={{
+              margin: 0,
+              padding: '0.55rem',
+              borderRadius: 8,
+              border: `1px solid ${importFailed ? '#fecaca' : '#bbf7d0'}`,
+              background: importFailed ? '#fff1f2' : '#f0fdf4',
+              color: importFailed ? '#9f1239' : '#166534',
+              whiteSpace: 'pre-wrap',
+              fontSize: '0.8rem',
+            }}
+          >
+            {importResult}
+          </pre>
+        )}
+      </div>
       {loading && <p>Loading requisitions…</p>}
       {error && <p style={{ color: '#b91c1c' }}>{error}</p>}
       {!loading && !error && (
