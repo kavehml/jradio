@@ -14,12 +14,24 @@ function getRange(query: { from?: string; to?: string }) {
   return { from, to };
 }
 
+function resolveTargetRadiologistId(
+  req: AuthRequest,
+  value: unknown
+): number {
+  if (req.user?.role === 'admin' && value !== undefined && value !== null && value !== '') {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed)) return parsed;
+  }
+  return req.user!.id;
+}
+
 router.get('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (req: AuthRequest, res) => {
   const { from, to } = getRange(req.query as { from?: string; to?: string });
+  const radiologistId = resolveTargetRadiologistId(req, (req.query as { radiologistId?: string }).radiologistId);
   try {
     const shifts = await ShiftAssignment.findAll({
       where: {
-        radiologistId: req.user!.id,
+        radiologistId,
         date: { [Op.between]: [from, to] },
       },
       order: [['date', 'ASC'], ['shiftType', 'ASC']],
@@ -38,7 +50,9 @@ router.post('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (
     shiftType?: ShiftType;
     site?: string;
     maxRvu?: number | null;
+    radiologistId?: number;
   };
+  const radiologistId = resolveTargetRadiologistId(req, req.body?.radiologistId);
   if (!date || !shiftType) {
     return res.status(400).json({ error: 'date and shiftType are required' });
   }
@@ -47,7 +61,7 @@ router.post('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (
   }
   try {
     const existing = await ShiftAssignment.findOne({
-      where: { radiologistId: req.user!.id, date, shiftType },
+      where: { radiologistId, date, shiftType },
     });
     if (existing) {
       existing.site = site || existing.site || 'General';
@@ -58,7 +72,7 @@ router.post('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (
       return res.json(existing);
     }
     const created = await ShiftAssignment.create({
-      radiologistId: req.user!.id,
+      radiologistId,
       date: new Date(date),
       shiftType,
       site: site || 'General',
@@ -72,13 +86,14 @@ router.post('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (
 });
 
 router.delete('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (req: AuthRequest, res) => {
-  const { date, shiftType } = req.body as { date?: string; shiftType?: ShiftType };
+  const { date, shiftType } = req.body as { date?: string; shiftType?: ShiftType; radiologistId?: number };
+  const radiologistId = resolveTargetRadiologistId(req, req.body?.radiologistId);
   if (!date || !shiftType) {
     return res.status(400).json({ error: 'date and shiftType are required' });
   }
   try {
     const deleted = await ShiftAssignment.destroy({
-      where: { radiologistId: req.user!.id, date, shiftType },
+      where: { radiologistId, date, shiftType },
     });
     return res.json({ deleted });
   } catch (err) {

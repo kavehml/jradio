@@ -3,9 +3,11 @@ import {
   deleteMyShift,
   getMyShifts,
   getShiftCoverage,
+  getUsers,
   saveMyShift,
   ShiftCoverageDto,
   ShiftDto,
+  UserDto,
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -38,10 +40,13 @@ function buildCalendarGrid(anchor: Date) {
 }
 
 export const RadiologistDashboard: React.FC = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [monthAnchor, setMonthAnchor] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string>(() => toIsoDate(new Date()));
   const [defaultSite, setDefaultSite] = useState('General');
+  const [radiologists, setRadiologists] = useState<UserDto[]>([]);
+  const [selectedRadiologistId, setSelectedRadiologistId] = useState<number | null>(null);
   const [myShifts, setMyShifts] = useState<ShiftDto[]>([]);
   const [coverage, setCoverage] = useState<ShiftCoverageDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +58,7 @@ export const RadiologistDashboard: React.FC = () => {
   const { start, end } = useMemo(() => monthRange(monthAnchor), [monthAnchor]);
   const from = toIsoDate(start);
   const to = toIsoDate(end);
+  const targetRadiologistId = isAdmin ? selectedRadiologistId : null;
 
   const myShiftMap = useMemo(() => {
     const map = new Map<string, ShiftDto>();
@@ -70,7 +76,10 @@ export const RadiologistDashboard: React.FC = () => {
     if (!token) return;
     setLoading(true);
     setMessage(null);
-    Promise.all([getMyShifts(token, from, to), getShiftCoverage(token, from, to)])
+    Promise.all([
+      getMyShifts(token, from, to, targetRadiologistId ?? undefined),
+      getShiftCoverage(token, from, to),
+    ])
       .then(([mine, teamCoverage]) => {
         setMyShifts(mine);
         setCoverage(teamCoverage);
@@ -86,18 +95,41 @@ export const RadiologistDashboard: React.FC = () => {
 
   useEffect(() => {
     refresh();
-  }, [token, from, to]);
+  }, [token, from, to, targetRadiologistId]);
+
+  useEffect(() => {
+    if (!token || !isAdmin) return;
+    getUsers(token)
+      .then((users) => {
+        const radiologistUsers = users.filter((u) => u.role === 'radiologist');
+        setRadiologists(radiologistUsers);
+        if (!selectedRadiologistId && radiologistUsers.length) {
+          setSelectedRadiologistId(radiologistUsers[0].id);
+        }
+      })
+      .catch((e) =>
+        setMessage(e instanceof Error ? e.message : 'Failed to load radiologists')
+      );
+  }, [token, isAdmin]);
 
   const isMine = (date: string, shiftType: ShiftType) => myShiftMap.has(`${date}_${shiftType}`);
 
   const toggleShift = async (date: string, shiftType: ShiftType) => {
     if (!token) return;
+    if (isAdmin && !targetRadiologistId) {
+      setMessage('Select a radiologist first.');
+      return;
+    }
     const key = `${date}_${shiftType}`;
     setSavingKey(key);
     setMessage(null);
     try {
       if (isMine(date, shiftType)) {
-        await deleteMyShift(token, { date, shiftType });
+        await deleteMyShift(token, {
+          date,
+          shiftType,
+          ...(targetRadiologistId ? { radiologistId: targetRadiologistId } : {}),
+        });
       } else {
         const rawMax = localMaxRvu[key];
         const maxRvu = rawMax && Number.isFinite(Number(rawMax)) ? Number(rawMax) : null;
@@ -106,6 +138,7 @@ export const RadiologistDashboard: React.FC = () => {
           shiftType,
           site: defaultSite || 'General',
           maxRvu,
+          ...(targetRadiologistId ? { radiologistId: targetRadiologistId } : {}),
         });
       }
       refresh();
@@ -118,6 +151,10 @@ export const RadiologistDashboard: React.FC = () => {
 
   const saveCapacity = async (date: string, shiftType: ShiftType) => {
     if (!token) return;
+    if (isAdmin && !targetRadiologistId) {
+      setMessage('Select a radiologist first.');
+      return;
+    }
     const key = `${date}_${shiftType}`;
     if (!isMine(date, shiftType)) return;
     setSavingKey(`${key}_capacity`);
@@ -125,7 +162,13 @@ export const RadiologistDashboard: React.FC = () => {
     try {
       const rawMax = localMaxRvu[key];
       const maxRvu = rawMax && Number.isFinite(Number(rawMax)) ? Number(rawMax) : null;
-      await saveMyShift(token, { date, shiftType, site: defaultSite || 'General', maxRvu });
+      await saveMyShift(token, {
+        date,
+        shiftType,
+        site: defaultSite || 'General',
+        maxRvu,
+        ...(targetRadiologistId ? { radiologistId: targetRadiologistId } : {}),
+      });
       refresh();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Failed to update RVU capacity');
@@ -158,6 +201,27 @@ export const RadiologistDashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {isAdmin && (
+        <div style={{ marginTop: 12, display: 'grid', gap: 8, maxWidth: 440 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>
+              Book shifts for radiologist
+            </span>
+            <select
+              value={selectedRadiologistId ?? ''}
+              onChange={(e) => setSelectedRadiologistId(Number(e.target.value))}
+            >
+              <option value="">Select radiologist...</option>
+              {radiologists.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       <div className="calendar-shell" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, marginTop: 14 }}>
         <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
@@ -258,11 +322,33 @@ export const RadiologistDashboard: React.FC = () => {
                   <div style={{ marginTop: 6, color: '#64748b', fontSize: '0.82rem' }}>
                     Team: {cov?.radiologistCount || 0} radiologists • Capacity: {cov?.totalMaxRvu || 0} RVU
                   </div>
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {(cov?.radiologists || []).map((r) => (
+                      <span
+                        key={r.id}
+                        style={{
+                          border: '1px solid #dbe2f0',
+                          borderRadius: 999,
+                          padding: '2px 8px',
+                          fontSize: '0.75rem',
+                          background: '#f8fafc',
+                        }}
+                      >
+                        {r.name}
+                        {r.maxRvu != null ? ` (${r.maxRvu})` : ''}
+                      </span>
+                    ))}
+                    {!cov?.radiologists?.length && (
+                      <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
+                        No radiologists booked yet.
+                      </span>
+                    )}
+                  </div>
                   <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6 }}>
                     <input
                       type="number"
                       min={0}
-                      placeholder="My max RVU for this shift"
+                      placeholder={isAdmin ? 'Selected radiologist max RVU' : 'My max RVU for this shift'}
                       value={localMaxRvu[key] ?? ''}
                       onChange={(e) => setLocalMaxRvu((prev) => ({ ...prev, [key]: e.target.value }))}
                     />

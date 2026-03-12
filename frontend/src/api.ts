@@ -439,8 +439,18 @@ export interface ShiftCoverageDto {
   radiologists: { id: number; name: string; maxRvu: number | null }[];
 }
 
-export async function getMyShifts(token: string, from: string, to: string) {
-  const res = await fetch(`${getApiBase()}/api/shifts/mine?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, {
+export async function getMyShifts(
+  token: string,
+  from: string,
+  to: string,
+  radiologistId?: number
+) {
+  const query = new URLSearchParams({
+    from,
+    to,
+    ...(radiologistId ? { radiologistId: String(radiologistId) } : {}),
+  });
+  const res = await fetch(`${getApiBase()}/api/shifts/mine?${query.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load my shifts');
@@ -450,7 +460,13 @@ export async function getMyShifts(token: string, from: string, to: string) {
 
 export async function saveMyShift(
   token: string,
-  data: { date: string; shiftType: 'AM' | 'PM' | 'NIGHT'; site?: string; maxRvu?: number | null }
+  data: {
+    date: string;
+    shiftType: 'AM' | 'PM' | 'NIGHT';
+    site?: string;
+    maxRvu?: number | null;
+    radiologistId?: number;
+  }
 ) {
   const res = await fetch(`${getApiBase()}/api/shifts/mine`, {
     method: 'POST',
@@ -481,7 +497,7 @@ export async function getShiftCoverage(token: string, from: string, to: string) 
 
 export async function deleteMyShift(
   token: string,
-  data: { date: string; shiftType: 'AM' | 'PM' | 'NIGHT' }
+  data: { date: string; shiftType: 'AM' | 'PM' | 'NIGHT'; radiologistId?: number }
 ) {
   const res = await fetch(`${getApiBase()}/api/shifts/mine`, {
     method: 'DELETE',
