@@ -144,7 +144,28 @@ export const RequisitionsAdmin: React.FC = () => {
     return cleanNotes ? `${examBlock}\nNotes: ${cleanNotes}` : examBlock;
   };
 
+  const toRangeName = (prefix: string, value: string) => {
+    const core = value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .replace(/_+/g, '_');
+    const safeCore = core || 'EMPTY';
+    return `${prefix}${/^[0-9]/.test(safeCore) ? '_' : ''}${safeCore}`;
+  };
+
   const downloadExcelTemplate = async () => {
+    const columnLetter = (n: number) => {
+      let value = n;
+      let result = '';
+      while (value > 0) {
+        const mod = (value - 1) % 26;
+        result = String.fromCharCode(65 + mod) + result;
+        value = Math.floor((value - mod) / 26);
+      }
+      return result;
+    };
+
     const workbook = new ExcelJS.Workbook();
     const dataSheet = workbook.addWorksheet('Requisitions');
     const listsSheet = workbook.addWorksheet('Lists');
@@ -153,24 +174,55 @@ export const RequisitionsAdmin: React.FC = () => {
     const modalityValues = Array.from(
       new Set(categories.map((c) => categoryModalityForUi(c)).filter(Boolean))
     ).sort((a, b) => a.localeCompare(b));
-    const categoryValues = Array.from(new Set(categories.map((c) => c.name))).sort((a, b) =>
-      a.localeCompare(b)
-    );
-    const subCategoryValues = Array.from(
-      new Set(Object.values(subCategoryMap).flat().filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b));
 
     listsSheet.getCell('A1').value = 'Modalities';
     modalityValues.forEach((value, idx) => {
       listsSheet.getCell(`A${idx + 2}`).value = value;
     });
-    listsSheet.getCell('B1').value = 'Categories';
-    categoryValues.forEach((value, idx) => {
-      listsSheet.getCell(`B${idx + 2}`).value = value;
+    const modalityListEnd = Math.max(modalityValues.length + 1, 2);
+    workbook.definedNames.add('MODALITY_LIST', `Lists!$A$2:$A$${modalityListEnd}`);
+
+    // Build named ranges for cascading dropdowns:
+    // - MOD_<MODALITY> points to that modality's categories
+    // - CAT_<CATEGORY> points to that category's subcategories
+    let nextListColumn = 2;
+    modalityValues.forEach((modality) => {
+      const modalityCategories = categories
+        .filter((c) => normalizeModality(categoryModalityForUi(c)) === normalizeModality(modality))
+        .map((c) => c.name)
+        .sort((a, b) => a.localeCompare(b));
+      const letter = columnLetter(nextListColumn);
+      const rangeName = toRangeName('MOD_', modality);
+      listsSheet.getCell(`${letter}1`).value = rangeName;
+      if (!modalityCategories.length) {
+        listsSheet.getCell(`${letter}2`).value = '';
+      } else {
+        modalityCategories.forEach((name, idx) => {
+          listsSheet.getCell(`${letter}${idx + 2}`).value = name;
+        });
+      }
+      const end = Math.max(modalityCategories.length + 1, 2);
+      workbook.definedNames.add(rangeName, `Lists!$${letter}$2:$${letter}$${end}`);
+      nextListColumn += 1;
     });
-    listsSheet.getCell('C1').value = 'Subcategories';
-    subCategoryValues.forEach((value, idx) => {
-      listsSheet.getCell(`C${idx + 2}`).value = value;
+
+    categories.forEach((category) => {
+      const rangeName = toRangeName('CAT_', category.name);
+      const values = Array.from(
+        new Set((subCategoryMap[category.id] || []).map((s) => s.trim()).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b));
+      const letter = columnLetter(nextListColumn);
+      listsSheet.getCell(`${letter}1`).value = rangeName;
+      if (!values.length) {
+        listsSheet.getCell(`${letter}2`).value = '';
+      } else {
+        values.forEach((value, idx) => {
+          listsSheet.getCell(`${letter}${idx + 2}`).value = value;
+        });
+      }
+      const end = Math.max(values.length + 1, 2);
+      workbook.definedNames.add(rangeName, `Lists!$${letter}$2:$${letter}$${end}`);
+      nextListColumn += 1;
     });
 
     const headers = [
@@ -186,6 +238,9 @@ export const RequisitionsAdmin: React.FC = () => {
       'hasImagingWithin24h',
       'modality',
       'categoryName',
+      'subCategory1',
+      'subCategory2',
+      'subCategory3',
       'subCategories',
       'withContrast',
       'notes',
@@ -204,31 +259,48 @@ export const RequisitionsAdmin: React.FC = () => {
       'FALSE',
       'CT',
       'CT HEAD',
+      'CT Head C+',
+      'CT C1A1',
+      '',
       'CT Head C+|CT C1A1',
       'FALSE',
       'Clinical context here',
     ]);
     dataSheet.getRow(1).font = { bold: true };
 
-    const modalityListEnd = Math.max(modalityValues.length + 1, 2);
-    const categoryListEnd = Math.max(categoryValues.length + 1, 2);
-    const subCategoryListEnd = Math.max(subCategoryValues.length + 1, 2);
-
     for (let row = 2; row <= 500; row += 1) {
+      // Helper keys for dependent dropdown named ranges
+      dataSheet.getCell(`R${row}`).value = {
+        formula: `SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(UPPER($K${row})," ","_"),"-","_"),"/","_"),"(",""),")","")`,
+      };
+      dataSheet.getCell(`S${row}`).value = {
+        formula: `SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(UPPER($L${row})," ","_"),"-","_"),"/","_"),"(",""),")","")`,
+      };
+
       dataSheet.getCell(`K${row}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: [`Lists!$A$2:$A$${modalityListEnd}`],
+        formulae: ['MODALITY_LIST'],
       };
       dataSheet.getCell(`L${row}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: [`Lists!$B$2:$B$${categoryListEnd}`],
+        formulae: [`INDIRECT("MOD_"&$R${row})`],
       };
       dataSheet.getCell(`M${row}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: [`Lists!$C$2:$C$${subCategoryListEnd}`],
+        formulae: [`INDIRECT("CAT_"&$S${row})`],
+      };
+      dataSheet.getCell(`N${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`INDIRECT("CAT_"&$S${row})`],
+      };
+      dataSheet.getCell(`O${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`INDIRECT("CAT_"&$S${row})`],
       };
       dataSheet.getCell(`D${row}`).dataValidation = {
         type: 'list',
@@ -240,17 +312,20 @@ export const RequisitionsAdmin: React.FC = () => {
         allowBlank: true,
         formulae: ['"TRUE,FALSE"'],
       };
-      dataSheet.getCell(`N${row}`).dataValidation = {
+      dataSheet.getCell(`Q${row}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['"TRUE,FALSE"'],
       };
     }
 
-    const widthByColumn = [22, 20, 16, 18, 20, 20, 24, 16, 14, 20, 12, 24, 28, 14, 34];
+    const widthByColumn = [22, 20, 16, 18, 20, 20, 24, 16, 14, 20, 12, 24, 20, 20, 20, 26, 14, 34];
     widthByColumn.forEach((width, index) => {
       dataSheet.getColumn(index + 1).width = width;
     });
+    // Hide helper columns with normalized keys.
+    dataSheet.getColumn(18).hidden = true;
+    dataSheet.getColumn(19).hidden = true;
     listsSheet.state = 'veryHidden';
 
     const helpRows: Array<[string, string, string]> = [
@@ -265,9 +340,10 @@ export const RequisitionsAdmin: React.FC = () => {
       ['dateOfRequest', 'No', 'YYYY-MM-DD'],
       ['timeDelayPreset', 'No', 'Example: 24h, 7d, 30d, 3m'],
       ['hasImagingWithin24h', 'No', 'Dropdown TRUE/FALSE'],
-      ['modality', 'Yes', 'Dropdown'],
-      ['categoryName', 'Yes', 'Dropdown'],
-      ['subCategories', 'No', 'Dropdown; use | to combine multiple'],
+      ['modality', 'Yes', 'Dropdown; drives category options'],
+      ['categoryName', 'Yes', 'Dropdown filtered by modality'],
+      ['subCategory1/2/3', 'No', 'Dropdowns filtered by category'],
+      ['subCategories', 'No', 'Optional text override; use | or comma for multiple'],
       ['withContrast', 'No', 'Dropdown TRUE/FALSE'],
       ['notes', 'No', 'Additional notes'],
     ];
@@ -363,7 +439,16 @@ export const RequisitionsAdmin: React.FC = () => {
         const dateOfRequest = readValue('dateOfRequest');
         const timeDelayPreset = readValue('timeDelayPreset', 'timeDelay');
         const notes = readValue('notes');
-        const selectedSubCategories = parseSubCategories(readValue('subCategories', 'subcategories'));
+        const selectedSubCategories = Array.from(
+          new Set(
+            [
+              ...parseSubCategories(readValue('subCategory1')),
+              ...parseSubCategories(readValue('subCategory2')),
+              ...parseSubCategories(readValue('subCategory3')),
+              ...parseSubCategories(readValue('subCategories', 'subcategories')),
+            ].filter(Boolean)
+          )
+        );
         const isNewExternalPatient = readBoolean('isNewExternalPatient') ?? false;
         const hasImagingWithin24h = readBoolean('hasImagingWithin24h');
         const withContrast = readBoolean('withContrast');
