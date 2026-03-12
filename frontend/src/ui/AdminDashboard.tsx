@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
+  createTimeDelayOption,
   createClinic,
   createSite,
   createUser,
   getClinics,
   getSites,
+  getTimeDelayOptions,
+  TimeDelayOptionDto,
   getUsers,
   updateRadiologistProfile,
   UserDto,
@@ -24,6 +27,9 @@ export const AdminDashboard: React.FC = () => {
   const [sites, setSites] = useState<{ id: number; name: string }[]>([]);
   const [newClinicName, setNewClinicName] = useState('');
   const [newSiteName, setNewSiteName] = useState('');
+  const [timeDelayOptions, setTimeDelayOptions] = useState<TimeDelayOptionDto[]>([]);
+  const [newDelayLabel, setNewDelayLabel] = useState('');
+  const [newDelayHours, setNewDelayHours] = useState('');
 
   const subspecialtyOptions = [
     { id: 'general', label: 'General' },
@@ -71,9 +77,14 @@ export const AdminDashboard: React.FC = () => {
     const loadMeta = async () => {
       if (!token) return;
       try {
-        const [clinicList, siteList] = await Promise.all([getClinics(token), getSites(token)]);
+        const [clinicList, siteList, delayList] = await Promise.all([
+          getClinics(token),
+          getSites(token),
+          getTimeDelayOptions(token),
+        ]);
         setClinics(clinicList);
         setSites(siteList);
+        setTimeDelayOptions(delayList);
       } catch (err) {
         setMessage({
           type: 'err',
@@ -152,6 +163,28 @@ export const AdminDashboard: React.FC = () => {
       setNewSiteName('');
     } catch (err) {
       setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to add site' });
+    }
+  };
+
+  const handleAddTimeDelay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    const label = newDelayLabel.trim();
+    const hours = Number(newDelayHours);
+    if (!label || !Number.isFinite(hours) || hours <= 0) {
+      setMessage({ type: 'err', text: 'Provide a valid delay label and hours' });
+      return;
+    }
+    try {
+      const created = await createTimeDelayOption(token, { label, hours });
+      setTimeDelayOptions((prev) => [...prev, created].sort((a, b) => a.hours - b.hours));
+      setNewDelayLabel('');
+      setNewDelayHours('');
+    } catch (err) {
+      setMessage({
+        type: 'err',
+        text: err instanceof Error ? err.message : 'Failed to add time delay option',
+      });
     }
   };
 
@@ -257,6 +290,35 @@ export const AdminDashboard: React.FC = () => {
               </li>
             ))}
             {sites.length === 0 && <li style={{ color: '#94a3b8' }}>No sites yet.</li>}
+          </ul>
+        </div>
+        <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
+          <h3 style={{ marginTop: 0 }}>Time delay options</h3>
+          <form onSubmit={handleAddTimeDelay} style={{ display: 'grid', gap: 8, marginBottom: '0.75rem' }}>
+            <input
+              type="text"
+              value={newDelayLabel}
+              onChange={(e) => setNewDelayLabel(e.target.value)}
+              placeholder='Label (e.g. "1 year")'
+            />
+            <input
+              type="number"
+              min={1}
+              value={newDelayHours}
+              onChange={(e) => setNewDelayHours(e.target.value)}
+              placeholder="Hours (e.g. 8760)"
+            />
+            <button type="submit" style={{ padding: '0.4rem 0.75rem', cursor: 'pointer', justifySelf: 'start' }}>
+              Add
+            </button>
+          </form>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 180, overflowY: 'auto', fontSize: '0.9rem' }}>
+            {timeDelayOptions.map((opt) => (
+              <li key={opt.id} style={{ padding: '0.25rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                {opt.label} ({opt.hours}h)
+              </li>
+            ))}
+            {timeDelayOptions.length === 0 && <li style={{ color: '#94a3b8' }}>No options yet.</li>}
           </ul>
         </div>
       </div>

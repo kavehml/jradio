@@ -117,6 +117,13 @@ export interface ImagingSubCategoryDto {
   name: string;
 }
 
+export interface TimeDelayOptionDto {
+  id: number;
+  code: string;
+  label: string;
+  hours: number;
+}
+
 export async function getImagingSubCategories(token: string) {
   const res = await fetch(`${getApiBase()}/api/imaging-categories/subcategories`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -153,6 +160,8 @@ export async function createRequisition(
   token: string,
   data: {
     patientIdOrTempLabel: string;
+    patientName?: string;
+    patientDateOfBirth?: string;
     isNewExternalPatient: boolean;
     orderingDoctorName: string;
     orderingClinic: string;
@@ -186,6 +195,8 @@ export async function createRequisition(
 export async function createPublicRequisition(
   data: {
     patientIdOrTempLabel: string;
+    patientName?: string;
+    patientDateOfBirth?: string;
     isNewExternalPatient: boolean;
     orderingDoctorName: string;
     orderingClinic: string;
@@ -263,9 +274,43 @@ export async function getPublicSites() {
   return json.sites;
 }
 
+export async function getTimeDelayOptions(token: string) {
+  const res = await fetch(`${getApiBase()}/api/meta/time-delay-options`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load time delay options');
+  const json = (await res.json()) as { options: TimeDelayOptionDto[] };
+  return json.options;
+}
+
+export async function getPublicTimeDelayOptions() {
+  const res = await fetch(`${getApiBase()}/api/meta/public/time-delay-options`);
+  if (!res.ok) throw new Error('Failed to load time delay options');
+  const json = (await res.json()) as { options: TimeDelayOptionDto[] };
+  return json.options;
+}
+
+export async function createTimeDelayOption(token: string, data: { label: string; hours: number }) {
+  const res = await fetch(`${getApiBase()}/api/meta/time-delay-options`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create time delay option');
+  }
+  return res.json() as Promise<TimeDelayOptionDto>;
+}
+
 export interface RequisitionSummary {
   id: number;
   patientIdOrTempLabel: string;
+  patientName?: string | null;
+  patientDateOfBirth?: string | null;
   orderingDoctorName: string;
   orderingClinic: string;
   site: string;

@@ -75,6 +75,8 @@ function mergeExamNotes(selectedSubCategories: string[], notes?: string | null):
 
 function validateAndBuildParams(body: {
   patientIdOrTempLabel?: string;
+  patientName?: string;
+  patientDateOfBirth?: string;
   isNewExternalPatient?: boolean;
   orderingDoctorName?: string;
   orderingClinic?: string;
@@ -105,6 +107,9 @@ function validateAndBuildParams(body: {
 
   const params = {
     patientIdOrTempLabel: body.patientIdOrTempLabel,
+    ...(body.patientName !== undefined && body.patientName !== '' && { patientName: body.patientName }),
+    ...(body.patientDateOfBirth !== undefined &&
+      body.patientDateOfBirth !== '' && { patientDateOfBirth: body.patientDateOfBirth }),
     isNewExternalPatient: !!body.isNewExternalPatient,
     orderingDoctorName: body.orderingDoctorName,
     orderingClinic: body.orderingClinic,
@@ -130,6 +135,8 @@ function validateAndBuildParams(body: {
 router.post('/', requireAuth, requireRole(['admin', 'clerical']), async (req, res) => {
   const body = req.body as {
     patientIdOrTempLabel?: string;
+    patientName?: string;
+    patientDateOfBirth?: string;
     isNewExternalPatient?: boolean;
     orderingDoctorName?: string;
     orderingClinic?: string;
@@ -163,6 +170,8 @@ router.post('/', requireAuth, requireRole(['admin', 'clerical']), async (req, re
 router.post('/public', async (req, res) => {
   const body = req.body as {
     patientIdOrTempLabel?: string;
+    patientName?: string;
+    patientDateOfBirth?: string;
     isNewExternalPatient?: boolean;
     orderingDoctorName?: string;
     orderingClinic?: string;
@@ -218,6 +227,8 @@ router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, re
       attributes: [
         'id',
         'patientIdOrTempLabel',
+        'patientName',
+        'patientDateOfBirth',
         'orderingDoctorName',
         'orderingClinic',
         'site',

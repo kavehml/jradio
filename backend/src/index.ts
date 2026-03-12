@@ -11,6 +11,7 @@ import './db/models/Requisition';
 import './db/models/RequisitionImagingItem';
 import './db/models/RequisitionSpecialtyRequirement';
 import './db/models/SpecialtyRule';
+import './db/models/TimeDelayOption';
 import './db/models/Visit';
 import './db/models/Clinic';
 import './db/models/SiteLocation';

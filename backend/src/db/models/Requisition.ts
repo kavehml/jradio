@@ -17,6 +17,8 @@ interface RequisitionAttributes {
   urgencyWindowHours: number | null;
   calculatedDueDate: Date | null;
   patientIdOrTempLabel: string;
+  patientName: string | null;
+  patientDateOfBirth: Date | null;
   isNewExternalPatient: boolean;
   orderingDoctorName: string;
   orderingClinic: string;
@@ -27,7 +29,14 @@ interface RequisitionAttributes {
 interface RequisitionCreationAttributes
   extends Optional<
     RequisitionAttributes,
-    'id' | 'createdAt' | 'requestedDate' | 'urgencyWindowHours' | 'calculatedDueDate' | 'status'
+    | 'id'
+    | 'createdAt'
+    | 'requestedDate'
+    | 'urgencyWindowHours'
+    | 'calculatedDueDate'
+    | 'patientName'
+    | 'patientDateOfBirth'
+    | 'status'
   > {}
 
 export class Requisition
@@ -40,6 +49,8 @@ export class Requisition
   public urgencyWindowHours!: number | null;
   public calculatedDueDate!: Date | null;
   public patientIdOrTempLabel!: string;
+  public patientName!: string | null;
+  public patientDateOfBirth!: Date | null;
   public isNewExternalPatient!: boolean;
   public orderingDoctorName!: string;
   public orderingClinic!: string;
@@ -74,6 +85,14 @@ Requisition.init(
     patientIdOrTempLabel: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    patientName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    patientDateOfBirth: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
     },
     isNewExternalPatient: {
       type: DataTypes.BOOLEAN,

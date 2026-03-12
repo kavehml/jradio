@@ -10,6 +10,9 @@ import {
   getPublicImagingSubCategories,
   getPublicClinics,
   getPublicSites,
+  getTimeDelayOptions,
+  getPublicTimeDelayOptions,
+  TimeDelayOptionDto,
 } from '../api';
 
 interface Category {
@@ -29,6 +32,8 @@ export const ClericalIntake: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [patientId, setPatientId] = useState('');
+  const [patientName, setPatientName] = useState('');
+  const [patientDob, setPatientDob] = useState('');
   const [isNewExternal, setIsNewExternal] = useState(false);
   const [orderingDoctor, setOrderingDoctor] = useState('');
   const [orderingClinic, setOrderingClinic] = useState('');
@@ -43,23 +48,26 @@ export const ClericalIntake: React.FC = () => {
   const [subCategories, setSubCategories] = useState<string[]>([]);
   const [mriSequences, setMriSequences] = useState<string[]>([]);
   const [subCategoryMap, setSubCategoryMap] = useState<Record<number, string[]>>({});
+  const [timeDelayOptions, setTimeDelayOptions] = useState<TimeDelayOptionDto[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
         // Prefer authenticated endpoints when a token is available, otherwise fall back to public ones.
-        const [cats, clinics, sites, subCategories] = token
+        const [cats, clinics, sites, subCategories, delayOptions] = token
           ? await Promise.all([
               getImagingCategories(token),
               getClinics(token),
               getSites(token),
               getImagingSubCategories(token),
+              getTimeDelayOptions(token),
             ])
           : await Promise.all([
               getPublicImagingCategories(),
               getPublicClinics(),
               getPublicSites(),
               getPublicImagingSubCategories(),
+              getPublicTimeDelayOptions(),
             ]);
         setCategories(cats);
         setClinicOptions(clinics);
@@ -70,6 +78,7 @@ export const ClericalIntake: React.FC = () => {
           map[s.categoryId].push(s.name);
         });
         setSubCategoryMap(map);
+        setTimeDelayOptions(delayOptions);
       } catch {
         setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' });
       } finally {
@@ -445,6 +454,8 @@ export const ClericalIntake: React.FC = () => {
     try {
       const result = await createRequisition(token, {
         patientIdOrTempLabel: patientId,
+        patientName: patientName || undefined,
+        patientDateOfBirth: patientDob || undefined,
         isNewExternalPatient: isNewExternal,
         orderingDoctorName: orderingDoctor,
         orderingClinic,
@@ -459,15 +470,17 @@ export const ClericalIntake: React.FC = () => {
         withContrast: false,
         notes:
           [
-            subCategories.length ? `Exams: ${subCategories.join(', ')}` : '',
+            subCategories.length ? `Exams:\n${subCategories.map((s) => `- ${s}`).join('\n')}` : '',
             modality === 'MRI' && mriSequences.length ? `Sequences: ${mriSequences.join(', ')}` : '',
             notes.trim() ? `Notes: ${notes.trim()}` : '',
           ]
             .filter(Boolean)
-            .join(' · ') || undefined,
+            .join('\n') || undefined,
       });
       setMessage({ type: 'ok', text: `Requisition created. Visit #${(result as { visitNumber?: string }).visitNumber}.` });
       setPatientId('');
+      setPatientName('');
+      setPatientDob('');
       setOrderingDoctor('');
       setOrderingClinic('');
       setSite('');
@@ -684,6 +697,14 @@ export const ClericalIntake: React.FC = () => {
           <span>MRN / Patient ID or temp label</span>
           <input type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
         </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span>Patient name</span>
+          <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span>Patient DOB</span>
+          <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} />
+        </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input type="checkbox" checked={isNewExternal} onChange={(e) => setIsNewExternal(e.target.checked)} />
           <span>New external patient</span>
@@ -740,10 +761,11 @@ export const ClericalIntake: React.FC = () => {
           <span>Time delay allowed</span>
           <select value={timeDelayPreset} onChange={(e) => setTimeDelayPreset(e.target.value)}>
             <option value="">Not specified</option>
-            <option value="24h">24 hours</option>
-            <option value="7d">7 days</option>
-            <option value="30d">30 days</option>
-            <option value="3m">3 months</option>
+            {timeDelayOptions.map((opt) => (
+              <option key={opt.code} value={opt.code}>
+                {opt.label}
+              </option>
+            ))}
           </select>
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

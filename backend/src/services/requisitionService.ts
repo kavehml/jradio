@@ -4,6 +4,7 @@ import { Visit } from '../db/models/Visit';
 import { SpecialtyRule } from '../db/models/SpecialtyRule';
 import { RequisitionSpecialtyRequirement } from '../db/models/RequisitionSpecialtyRequirement';
 import { ImagingCategory } from '../db/models/ImagingCategory';
+import { TimeDelayOption } from '../db/models/TimeDelayOption';
 import { Op } from 'sequelize';
 import { sequelize } from '../db/index';
 
@@ -11,8 +12,13 @@ import { sequelize } from '../db/index';
 const DEFAULT_CONTROL_DAYS = 90;
 const DEFAULT_PRIMARY_DAYS = 30;
 
-function parseTimeDelayPreset(preset: string | undefined): number | null {
+async function parseTimeDelayPreset(preset: string | undefined): Promise<number | null> {
   if (!preset) return null;
+  const configured = await TimeDelayOption.findOne({
+    where: { code: preset, active: true },
+    attributes: ['hours'],
+  });
+  if (configured) return configured.hours;
   const lower = preset.toLowerCase();
   if (lower === '24h') return 24;
   if (lower === '7d') return 7 * 24;
@@ -61,6 +67,8 @@ export async function resolveRequiredSubspecialties(params: {
 
 export async function createRequisition(params: {
   patientIdOrTempLabel: string;
+  patientName?: string;
+  patientDateOfBirth?: string;
   isNewExternalPatient: boolean;
   orderingDoctorName: string;
   orderingClinic: string;
@@ -78,7 +86,7 @@ export async function createRequisition(params: {
   return sequelize.transaction(async (tx) => {
     const now = new Date();
     let calculatedDueDate: Date | null = null;
-    const hours = parseTimeDelayPreset(params.timeDelayPreset);
+    const hours = await parseTimeDelayPreset(params.timeDelayPreset);
     if (hours != null) {
       calculatedDueDate = new Date(now.getTime() + hours * 60 * 60 * 1000);
     } else {
@@ -96,6 +104,8 @@ export async function createRequisition(params: {
         urgencyWindowHours,
         calculatedDueDate,
         patientIdOrTempLabel: params.patientIdOrTempLabel,
+        patientName: params.patientName?.trim() || null,
+        patientDateOfBirth: params.patientDateOfBirth ? new Date(params.patientDateOfBirth) : null,
         isNewExternalPatient: params.isNewExternalPatient,
         orderingDoctorName: params.orderingDoctorName,
         orderingClinic: params.orderingClinic,
