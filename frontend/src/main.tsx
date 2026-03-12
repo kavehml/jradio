@@ -10,6 +10,7 @@ import { AdminDashboard } from './ui/AdminDashboard';
 import { PublicRequisitionForm } from './ui/PublicRequisitionForm';
 import { RequisitionsAdmin } from './ui/RequisitionsAdmin';
 import { SpecialtyRulesAdmin } from './ui/SpecialtyRulesAdmin';
+import './styles.css';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();

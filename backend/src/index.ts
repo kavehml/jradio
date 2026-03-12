@@ -32,7 +32,7 @@ dotenv.config();
 
 async function bootstrap() {
   await initDb();
-  await sequelize.sync();
+  await sequelize.sync({ alter: true });
   await ensureAdminUser();
   await seedImagingCategoriesIfEmpty();
 
