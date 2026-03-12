@@ -6,8 +6,111 @@ import { Visit } from '../db/models/Visit';
 import { RequisitionImagingItem } from '../db/models/RequisitionImagingItem';
 import { RequisitionSpecialtyRequirement } from '../db/models/RequisitionSpecialtyRequirement';
 import { ImagingCategory } from '../db/models/ImagingCategory';
+import { ReportingAssignment } from '../db/models/Assignments';
+import { ShiftAssignment, ShiftType } from '../db/models/ShiftAssignment';
+import { User } from '../db/models/User';
+import { Op } from 'sequelize';
 
 const router = Router();
+
+function parseIsoDateOnly(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function isShiftMatch(dt: Date, shift: ShiftType): boolean {
+  const h = dt.getHours();
+  if (shift === 'AM') return h >= 6 && h < 14;
+  if (shift === 'PM') return h >= 14 && h < 22;
+  return h >= 22 || h < 6;
+}
+
+async function loadShiftApprovedRequisitions(params: { date: string; shift: ShiftType }) {
+  const dayStart = parseIsoDateOnly(params.date);
+  if (!dayStart) return [];
+  const dayEnd = new Date(dayStart);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
+  const requisitionsRaw = await Requisition.findAll({
+    where: { status: 'approved' },
+    include: [
+      {
+        model: Visit,
+        as: 'visit',
+        attributes: ['visitNumber', 'scheduledDateTime'],
+        where: {
+          scheduledDateTime: {
+            [Op.gte]: dayStart,
+            [Op.lt]: dayEnd,
+          },
+        },
+      },
+      {
+        model: RequisitionImagingItem,
+        as: 'imagingItems',
+        attributes: ['rvuValue'],
+      },
+      {
+        model: ReportingAssignment,
+        as: 'reportingAssignments',
+        required: false,
+        where: { status: { [Op.in]: ['assigned', 'completed'] } },
+        attributes: ['id', 'status'],
+      },
+    ],
+    attributes: ['id', 'patientIdOrTempLabel'],
+    order: [['id', 'ASC']],
+  });
+
+  const requisitions = requisitionsRaw as Array<
+    Requisition & {
+      visit?: { visitNumber?: string | null; scheduledDateTime?: Date | string | null } | null;
+      imagingItems?: Array<{ rvuValue?: number | null }>;
+      reportingAssignments?: Array<{ id: number; status: string }>;
+    }
+  >;
+
+  return requisitions.filter((r) => {
+    const scheduled = r.visit?.scheduledDateTime ? new Date(r.visit.scheduledDateTime) : null;
+    return scheduled ? isShiftMatch(scheduled, params.shift) : false;
+  });
+}
+
+function weightedDistribute(
+  requisitions: Array<{ id: number; rvuValue: number }>,
+  participants: Array<{ radiologistId: number; weight: number }>
+) {
+  const usableParticipants = participants.filter((p) => Number.isFinite(p.weight) && p.weight > 0);
+  const totalWeight = usableParticipants.reduce((sum, p) => sum + p.weight, 0);
+  if (!usableParticipants.length || totalWeight <= 0) return [];
+
+  const totalRvu = requisitions.reduce((sum, r) => sum + (r.rvuValue || 1), 0);
+  const state = usableParticipants.map((p) => ({
+    radiologistId: p.radiologistId,
+    weight: p.weight,
+    targetRvu: (totalRvu * p.weight) / totalWeight,
+    assignedRvu: 0,
+    requisitionIds: [] as number[],
+  }));
+
+  const ordered = [...requisitions].sort((a, b) => b.rvuValue - a.rvuValue);
+  ordered.forEach((reqn) => {
+    state.sort((a, b) => {
+      const aGap = a.targetRvu - a.assignedRvu;
+      const bGap = b.targetRvu - b.assignedRvu;
+      if (bGap !== aGap) return bGap - aGap;
+      return a.assignedRvu - b.assignedRvu;
+    });
+    const slot = state[0];
+    if (!slot) return;
+    slot.assignedRvu += reqn.rvuValue || 1;
+    slot.requisitionIds.push(reqn.id);
+  });
+
+  return state;
+}
 
 function computeRvuForImaging(bodyParts: string[], modality: string): number {
   if (modality.toLowerCase() === 'angio') return 3;
@@ -259,6 +362,133 @@ router.post('/bulk', requireAuth, requireRole(['admin', 'clerical']), async (req
     created,
     errors,
   });
+});
+
+router.get('/assigning/summary', requireAuth, requireRole(['admin']), async (req, res) => {
+  const { date, shift } = req.query as { date?: string; shift?: ShiftType };
+  if (!date || !shift || !['AM', 'PM', 'NIGHT'].includes(shift)) {
+    return res.status(400).json({ error: 'date (YYYY-MM-DD) and shift (AM|PM|NIGHT) are required' });
+  }
+  try {
+    const requisitions = await loadShiftApprovedRequisitions({ date, shift });
+    const rows = requisitions.map((r) => {
+      const rvuValue = r.imagingItems?.[0]?.rvuValue ?? 1;
+      const alreadyAssigned = Boolean(r.reportingAssignments?.length);
+      return {
+        id: r.id,
+        visitNumber: r.visit?.visitNumber ?? null,
+        patientIdOrTempLabel: r.patientIdOrTempLabel,
+        rvuValue,
+        alreadyAssigned,
+      };
+    });
+    const approvedForShiftCount = rows.length;
+    const eligibleRows = rows.filter((r) => !r.alreadyAssigned);
+    const eligibleCount = eligibleRows.length;
+    const alreadyAssignedCount = approvedForShiftCount - eligibleCount;
+    const totalRvu = eligibleRows.reduce((sum, r) => sum + r.rvuValue, 0);
+    return res.json({
+      date,
+      shift,
+      approvedForShiftCount,
+      eligibleCount,
+      alreadyAssignedCount,
+      totalRvu,
+      rows,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load assigning summary' });
+  }
+});
+
+router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async (req, res) => {
+  const body = req.body as {
+    date?: string;
+    shift?: ShiftType;
+    participants?: Array<{ radiologistId?: number; weight?: number }>;
+  };
+  if (!body.date || !body.shift || !['AM', 'PM', 'NIGHT'].includes(body.shift)) {
+    return res.status(400).json({ error: 'date and shift are required' });
+  }
+  const participants = Array.isArray(body.participants) ? body.participants : [];
+  const normalizedParticipants = participants
+    .map((p) => ({ radiologistId: Number(p.radiologistId), weight: Number(p.weight ?? 1) }))
+    .filter((p) => Number.isInteger(p.radiologistId) && Number.isFinite(p.weight) && p.weight > 0);
+  if (!normalizedParticipants.length) {
+    return res.status(400).json({ error: 'At least one participant with weight > 0 is required' });
+  }
+
+  try {
+    const requisitions = await loadShiftApprovedRequisitions({ date: body.date, shift: body.shift });
+    const eligible = requisitions
+      .filter((r) => !r.reportingAssignments?.length)
+      .map((r) => ({
+        id: r.id,
+        rvuValue: r.imagingItems?.[0]?.rvuValue ?? 1,
+      }));
+
+    const distribution = weightedDistribute(eligible, normalizedParticipants);
+    const participantIds = Array.from(new Set(distribution.map((d) => d.radiologistId)));
+    const users = await User.findAll({
+      where: { id: { [Op.in]: participantIds } },
+      attributes: ['id', 'name'],
+    });
+    const userMap = new Map(users.map((u) => [u.id, u.name]));
+
+    const shifts = await ShiftAssignment.findAll({
+      where: {
+        date: body.date,
+        shiftType: body.shift,
+        radiologistId: { [Op.in]: participantIds },
+      },
+      attributes: ['id', 'radiologistId'],
+    });
+    const shiftIdByRadiologist = new Map(shifts.map((s) => [s.radiologistId, s.id]));
+
+    const toCreate: Array<{
+      requisitionId: number;
+      reportingRadiologistId: number;
+      shiftId: number | null;
+      status: 'assigned';
+      assignedAt: Date;
+    }> = [];
+    distribution.forEach((slot) => {
+      slot.requisitionIds.forEach((requisitionId) => {
+        toCreate.push({
+          requisitionId,
+          reportingRadiologistId: slot.radiologistId,
+          shiftId: shiftIdByRadiologist.get(slot.radiologistId) ?? null,
+          status: 'assigned',
+          assignedAt: new Date(),
+        });
+      });
+    });
+
+    if (toCreate.length) {
+      await ReportingAssignment.bulkCreate(toCreate);
+    }
+
+    return res.json({
+      date: body.date,
+      shift: body.shift,
+      assignedCount: toCreate.length,
+      totalRvu: eligible.reduce((sum, r) => sum + r.rvuValue, 0),
+      participants: distribution.map((d) => ({
+        radiologistId: d.radiologistId,
+        radiologistName: userMap.get(d.radiologistId) || `User ${d.radiologistId}`,
+        weight: d.weight,
+        targetRvu: Number(d.targetRvu.toFixed(2)),
+        assignedRvu: d.assignedRvu,
+        assignedRequisitionCount: d.requisitionIds.length,
+        requisitionIds: d.requisitionIds,
+      })),
+      unassignedCount: 0,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to distribute requisitions' });
+  }
 });
 
 // List requisitions for admins/clerical

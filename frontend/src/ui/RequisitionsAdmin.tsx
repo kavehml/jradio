@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { useAuth } from '../auth/AuthContext';
 import {
   approveRequisition,
@@ -143,65 +144,151 @@ export const RequisitionsAdmin: React.FC = () => {
     return cleanNotes ? `${examBlock}\nNotes: ${cleanNotes}` : examBlock;
   };
 
-  const downloadExcelTemplate = () => {
-    const sampleRows = [
-      {
-        patientIdOrTempLabel: 'MRN-001',
-        patientName: 'Jane Doe',
-        patientDateOfBirth: '1985-08-17',
-        isNewExternalPatient: 'FALSE',
-        orderingDoctorName: 'Dr. Smith',
-        orderingClinic: 'Downtown Clinic',
-        site: 'Jewish General Hospital',
-        dateOfRequest: '2026-03-12',
-        timeDelayPreset: '24h',
-        hasImagingWithin24h: 'FALSE',
-        modality: 'CT',
-        categoryName: 'CT HEAD',
-        subCategories: 'CT Head C+|CT C1A1',
-        withContrast: 'FALSE',
-        notes: 'Clinical context here',
-      },
+  const downloadExcelTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const dataSheet = workbook.addWorksheet('Requisitions');
+    const listsSheet = workbook.addWorksheet('Lists');
+    const instructionsSheet = workbook.addWorksheet('Instructions');
+
+    const modalityValues = Array.from(
+      new Set(categories.map((c) => categoryModalityForUi(c)).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
+    const categoryValues = Array.from(new Set(categories.map((c) => c.name))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+    const subCategoryValues = Array.from(
+      new Set(Object.values(subCategoryMap).flat().filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
+
+    listsSheet.getCell('A1').value = 'Modalities';
+    modalityValues.forEach((value, idx) => {
+      listsSheet.getCell(`A${idx + 2}`).value = value;
+    });
+    listsSheet.getCell('B1').value = 'Categories';
+    categoryValues.forEach((value, idx) => {
+      listsSheet.getCell(`B${idx + 2}`).value = value;
+    });
+    listsSheet.getCell('C1').value = 'Subcategories';
+    subCategoryValues.forEach((value, idx) => {
+      listsSheet.getCell(`C${idx + 2}`).value = value;
+    });
+
+    const headers = [
+      'patientIdOrTempLabel',
+      'patientName',
+      'patientDateOfBirth',
+      'isNewExternalPatient',
+      'orderingDoctorName',
+      'orderingClinic',
+      'site',
+      'dateOfRequest',
+      'timeDelayPreset',
+      'hasImagingWithin24h',
+      'modality',
+      'categoryName',
+      'subCategories',
+      'withContrast',
+      'notes',
     ];
+    dataSheet.addRow(headers);
+    dataSheet.addRow([
+      'MRN-001',
+      'Jane Doe',
+      '1985-08-17',
+      'FALSE',
+      'Dr. Smith',
+      'Downtown Clinic',
+      'Jewish General Hospital',
+      '2026-03-12',
+      '24h',
+      'FALSE',
+      'CT',
+      'CT HEAD',
+      'CT Head C+|CT C1A1',
+      'FALSE',
+      'Clinical context here',
+    ]);
+    dataSheet.getRow(1).font = { bold: true };
 
-    const workbook = XLSX.utils.book_new();
-    const dataSheet = XLSX.utils.json_to_sheet(sampleRows);
-    XLSX.utils.book_append_sheet(workbook, dataSheet, 'Requisitions');
+    const modalityListEnd = Math.max(modalityValues.length + 1, 2);
+    const categoryListEnd = Math.max(categoryValues.length + 1, 2);
+    const subCategoryListEnd = Math.max(subCategoryValues.length + 1, 2);
 
-    const helpRows = [
+    for (let row = 2; row <= 500; row += 1) {
+      dataSheet.getCell(`K${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`Lists!$A$2:$A$${modalityListEnd}`],
+      };
+      dataSheet.getCell(`L${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`Lists!$B$2:$B$${categoryListEnd}`],
+      };
+      dataSheet.getCell(`M${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`Lists!$C$2:$C$${subCategoryListEnd}`],
+      };
+      dataSheet.getCell(`D${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"TRUE,FALSE"'],
+      };
+      dataSheet.getCell(`J${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"TRUE,FALSE"'],
+      };
+      dataSheet.getCell(`N${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"TRUE,FALSE"'],
+      };
+    }
+
+    const widthByColumn = [22, 20, 16, 18, 20, 20, 24, 16, 14, 20, 12, 24, 28, 14, 34];
+    widthByColumn.forEach((width, index) => {
+      dataSheet.getColumn(index + 1).width = width;
+    });
+    listsSheet.state = 'veryHidden';
+
+    const helpRows: Array<[string, string, string]> = [
       ['Field', 'Required', 'Expected format'],
       ['patientIdOrTempLabel', 'Yes', 'Any identifier (MRN / temp label)'],
       ['patientName', 'No', 'Patient full name'],
       ['patientDateOfBirth', 'No', 'YYYY-MM-DD'],
-      ['isNewExternalPatient', 'No', 'TRUE or FALSE'],
+      ['isNewExternalPatient', 'No', 'Dropdown TRUE/FALSE'],
       ['orderingDoctorName', 'Yes', 'Ordering doctor name'],
       ['orderingClinic', 'Yes', 'Clinic name'],
       ['site', 'Yes', 'Site/location'],
       ['dateOfRequest', 'No', 'YYYY-MM-DD'],
       ['timeDelayPreset', 'No', 'Example: 24h, 7d, 30d, 3m'],
-      ['hasImagingWithin24h', 'No', 'TRUE or FALSE'],
-      ['modality', 'Yes', 'CT, MRI, US, PET, X-ray'],
-      ['categoryName', 'Yes', 'Must match existing category name exactly'],
-      ['subCategories', 'No', 'Separate multiple values with |'],
-      ['withContrast', 'No', 'TRUE or FALSE'],
+      ['hasImagingWithin24h', 'No', 'Dropdown TRUE/FALSE'],
+      ['modality', 'Yes', 'Dropdown'],
+      ['categoryName', 'Yes', 'Dropdown'],
+      ['subCategories', 'No', 'Dropdown; use | to combine multiple'],
+      ['withContrast', 'No', 'Dropdown TRUE/FALSE'],
       ['notes', 'No', 'Additional notes'],
     ];
-    const helpSheet = XLSX.utils.aoa_to_sheet(helpRows);
-    XLSX.utils.book_append_sheet(workbook, helpSheet, 'Instructions');
+    helpRows.forEach((row) => instructionsSheet.addRow(row));
+    instructionsSheet.getRow(1).font = { bold: true };
+    instructionsSheet.getColumn(1).width = 24;
+    instructionsSheet.getColumn(2).width = 12;
+    instructionsSheet.getColumn(3).width = 44;
 
-    const categoryRows = categories
-      .map((c) => ({
-        modality: categoryModalityForUi(c),
-        categoryName: c.name,
-        bodyPart: c.bodyPart,
-      }))
-      .sort((a, b) =>
-        `${a.modality}-${a.categoryName}`.localeCompare(`${b.modality}-${b.categoryName}`)
-      );
-    const categoriesSheet = XLSX.utils.json_to_sheet(categoryRows);
-    XLSX.utils.book_append_sheet(workbook, categoriesSheet, 'Available Categories');
-
-    XLSX.writeFile(workbook, 'requisition-bulk-template.xlsx');
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'requisition-bulk-template.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleImportExcel = async () => {
@@ -643,7 +730,7 @@ export const RequisitionsAdmin: React.FC = () => {
         }}
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          <button type="button" onClick={downloadExcelTemplate}>
+          <button type="button" onClick={() => void downloadExcelTemplate()}>
             Download sample Excel
           </button>
           <input

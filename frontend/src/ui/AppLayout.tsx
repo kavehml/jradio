@@ -17,6 +17,7 @@ export const AppLayout: React.FC = () => {
   const canSeeAdmin = role === 'admin';
   const canSeeClerical = role === 'admin' || role === 'clerical';
   const canSeeRequisitions = role === 'admin' || role === 'clerical';
+  const canSeeAssigning = role === 'admin';
   const canSeeServiceRules = role === 'admin';
   const canSeeRadiologist = true;
 
@@ -24,6 +25,7 @@ export const AppLayout: React.FC = () => {
     canSeeRadiologist ? { to: '/radiologist', label: 'Radiologist portal', key: 'radiologist' } : null,
     canSeeClerical ? { to: '/clerical', label: 'Clerical intake', key: 'clerical' } : null,
     canSeeRequisitions ? { to: '/requisitions', label: 'Requisitions', key: 'requisitions' } : null,
+    canSeeAssigning ? { to: '/assigning', label: 'Assigning', key: 'assigning' } : null,
     canSeeServiceRules ? { to: '/service-rules', label: 'Service rules', key: 'service-rules' } : null,
     canSeeAdmin ? { to: '/admin', label: 'Admin portal', key: 'admin' } : null,
   ].filter((x): x is { to: string; label: string; key: string } => Boolean(x));

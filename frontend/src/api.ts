@@ -376,6 +376,46 @@ export interface BulkRequisitionCreateResult {
   errors: Array<{ index: number; error: string }>;
 }
 
+export interface AssigningSummaryRow {
+  id: number;
+  visitNumber: string | null;
+  patientIdOrTempLabel: string;
+  rvuValue: number;
+  alreadyAssigned: boolean;
+}
+
+export interface AssigningSummary {
+  date: string;
+  shift: 'AM' | 'PM' | 'NIGHT';
+  approvedForShiftCount: number;
+  eligibleCount: number;
+  alreadyAssignedCount: number;
+  totalRvu: number;
+  rows: AssigningSummaryRow[];
+}
+
+export interface AssigningParticipantInput {
+  radiologistId: number;
+  weight: number;
+}
+
+export interface AssigningDistributionResult {
+  date: string;
+  shift: 'AM' | 'PM' | 'NIGHT';
+  assignedCount: number;
+  totalRvu: number;
+  participants: Array<{
+    radiologistId: number;
+    radiologistName: string;
+    weight: number;
+    targetRvu: number;
+    assignedRvu: number;
+    assignedRequisitionCount: number;
+    requisitionIds: number[];
+  }>;
+  unassignedCount: number;
+}
+
 export interface SpecialtyRuleDto {
   id: number;
   modality: string;
@@ -413,6 +453,37 @@ export async function createRequisitionsBulk(
     throw new Error(payload.error || 'Failed to import requisitions');
   }
   return payload as BulkRequisitionCreateResult;
+}
+
+export async function getAssigningSummary(token: string, date: string, shift: 'AM' | 'PM' | 'NIGHT') {
+  const query = new URLSearchParams({ date, shift });
+  const res = await fetch(`${getApiBase()}/api/requisitions/assigning/summary?${query.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to load assigning summary');
+  }
+  return res.json() as Promise<AssigningSummary>;
+}
+
+export async function distributeAssigning(
+  token: string,
+  data: { date: string; shift: 'AM' | 'PM' | 'NIGHT'; participants: AssigningParticipantInput[] }
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/assigning/distribute`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to distribute assignments');
+  }
+  return res.json() as Promise<AssigningDistributionResult>;
 }
 
 export async function updateRequisitionSchedule(

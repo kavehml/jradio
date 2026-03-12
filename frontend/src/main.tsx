@@ -10,6 +10,7 @@ import { AdminDashboard } from './ui/AdminDashboard';
 import { PublicRequisitionForm } from './ui/PublicRequisitionForm';
 import { RequisitionsAdmin } from './ui/RequisitionsAdmin';
 import { SpecialtyRulesAdmin } from './ui/SpecialtyRulesAdmin';
+import { AssigningTab } from './ui/AssigningTab';
 import './styles.css';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -37,6 +38,7 @@ const Root = () => (
           <Route path="radiologist" element={<RadiologistDashboard />} />
           <Route path="clerical" element={<ClericalIntake />} />
           <Route path="requisitions" element={<RequisitionsAdmin />} />
+          <Route path="assigning" element={<AssigningTab />} />
           <Route path="service-rules" element={<SpecialtyRulesAdmin />} />
           <Route path="admin" element={<AdminDashboard />} />
         </Route>
