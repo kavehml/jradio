@@ -109,7 +109,7 @@ export function LoginPage() {
           style={{
             width: '100%',
             padding: '0.75rem',
-            background: submitting ? '#94a3b8' : '#3b82f6',
+            background: submitting ? '#94a3b8' : 'rgb(200,103,51)',
             color: 'white',
             border: 'none',
             borderRadius: 8,

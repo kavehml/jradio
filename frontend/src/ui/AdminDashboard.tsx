@@ -421,8 +421,8 @@ export const AdminDashboard: React.FC = () => {
                                   gap: 4,
                                   padding: '2px 6px',
                                   borderRadius: 999,
-                                  border: checked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-                                  background: checked ? '#eff6ff' : '#f8fafc',
+                                  border: checked ? '1px solid #c86733' : '1px solid #e2e8f0',
+                                  background: checked ? '#fff2ea' : '#f8fafc',
                                   cursor: 'pointer',
                                 }}
                               >

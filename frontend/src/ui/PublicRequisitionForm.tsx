@@ -492,9 +492,9 @@ export const PublicRequisitionForm: React.FC = () => {
                 style={{
                   padding: '0.35rem 0.9rem',
                   borderRadius: 999,
-                  border: modality === m ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                  background: modality === m ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fbff',
-                  color: modality === m ? '#1d4ed8' : '#334155',
+                  border: modality === m ? '2px solid #c86733' : '1px solid #e2e8f0',
+                  background: modality === m ? 'linear-gradient(135deg, #f8dfd0 0%, #fdeee6 100%)' : '#fffaf7',
+                  color: modality === m ? '#9a4a20' : '#334155',
                   fontWeight: 600,
                   cursor: 'pointer',
                   fontSize: '0.9rem',
@@ -526,9 +526,9 @@ export const PublicRequisitionForm: React.FC = () => {
                     }}
                     style={{
                       padding: '0.75rem 0.5rem',
-                      border: '2px solid ' + (selectedCategory?.id === cat.id ? '#3b82f6' : '#e2e8f0'),
+                      border: '2px solid ' + (selectedCategory?.id === cat.id ? '#c86733' : '#e2e8f0'),
                       borderRadius: 8,
-                      background: selectedCategory?.id === cat.id ? '#eff6ff' : 'white',
+                      background: selectedCategory?.id === cat.id ? '#fff2ea' : 'white',
                       color: '#0f172a',
                       cursor: 'pointer',
                       textAlign: 'left',

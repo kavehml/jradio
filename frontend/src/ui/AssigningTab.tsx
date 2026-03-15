@@ -186,7 +186,7 @@ export const AssigningTab: React.FC = () => {
             gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
             gap: 8,
             background: '#f8fbff',
-            border: '1px solid #dbeafe',
+            border: '1px solid #f0cdb8',
             borderRadius: 10,
             padding: '0.75rem',
           }}

@@ -358,8 +358,8 @@ export const RadiologistDashboard: React.FC = () => {
                               borderRadius: 8,
                               padding: '2px 6px',
                               fontSize: '0.72rem',
-                              background: mine ? 'rgba(91,99,246,0.12)' : '#f8fafc',
-                              color: mine ? '#404ad8' : '#334155',
+                              background: mine ? 'rgba(200,103,51,0.16)' : '#f8fafc',
+                              color: mine ? '#9a4a20' : '#334155',
                             }}
                           >
                             {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU
@@ -409,8 +409,8 @@ export const RadiologistDashboard: React.FC = () => {
                               borderRadius: 8,
                               padding: '4px 7px',
                               fontSize: '0.76rem',
-                              background: mine ? 'rgba(91,99,246,0.12)' : '#f8fafc',
-                              color: mine ? '#404ad8' : '#334155',
+                              background: mine ? 'rgba(200,103,51,0.16)' : '#f8fafc',
+                              color: mine ? '#9a4a20' : '#334155',
                             }}
                           >
                             {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU

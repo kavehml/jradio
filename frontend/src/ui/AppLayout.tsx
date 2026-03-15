@@ -60,8 +60,8 @@ export const AppLayout: React.FC = () => {
                   textDecoration: 'none',
                   padding: '0.62rem 0.72rem',
                   borderRadius: 10,
-                  background: active ? 'rgba(91,99,246,0.12)' : 'transparent',
-                  color: active ? '#353fd5' : '#334155',
+                  background: active ? 'rgba(200,103,51,0.16)' : 'transparent',
+                  color: active ? '#9a4a20' : '#334155',
                   fontWeight: active ? 600 : 500,
                 }}
               >

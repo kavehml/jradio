@@ -807,7 +807,7 @@ export const RequisitionsAdmin: React.FC = () => {
         style={{
           marginBottom: '0.9rem',
           padding: '0.75rem',
-          border: '1px solid #dbeafe',
+          border: '1px solid #f0cdb8',
           borderRadius: 10,
           background: '#f8fbff',
           display: 'grid',
