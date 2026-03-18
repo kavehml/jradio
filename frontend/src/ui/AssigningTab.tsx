@@ -4,6 +4,7 @@ import {
   AssigningSummary,
   downloadAssigningRadiologistPdf,
   distributeAssigning,
+  getAssigningDistributionState,
   getAssigningRadiologistWorklist,
   getAssigningSummary,
   getShiftCoverage,
@@ -44,10 +45,11 @@ export const AssigningTab: React.FC = () => {
     setError(null);
     setMessage(null);
     try {
-      const [users, coverage, summaryRes] = await Promise.all([
+      const [users, coverage, summaryRes, state] = await Promise.all([
         getUsers(token),
         getShiftCoverage(token, date, date),
         getAssigningSummary(token, date, shift),
+        getAssigningDistributionState(token, { date, shift }),
       ]);
       const radiologists = users
         .filter((u) => u.role === 'radiologist')
@@ -75,9 +77,23 @@ export const AssigningTab: React.FC = () => {
       const autoParticipants: ParticipantRow[] = Array.from(byId.values()).sort((a, b) =>
         a.name.localeCompare(b.name)
       );
-      setParticipants(autoParticipants);
+      if (state.participants.length) {
+        setParticipants(
+          state.participants.map((p) => ({
+            radiologistId: p.radiologistId,
+            name: p.radiologistName,
+            weight: p.weight || 1,
+            fromCalendar: true,
+          }))
+        );
+        setDistributionResult(state);
+      } else {
+        setParticipants(autoParticipants);
+        setDistributionResult(null);
+      }
       setSummary(summaryRes);
       setSelectedRadiologistId(radiologists[0]?.id ?? null);
+      setActiveWorklist(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load assigning data');
     } finally {

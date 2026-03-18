@@ -636,10 +636,113 @@ type ReportingAssignmentWithDetails = ReportingAssignment & {
     imagingItems?: Array<{
       modality?: string | null;
       specialNotes?: string | null;
+      rvuValue?: number | null;
       category?: { name?: string | null } | null;
     }>;
   } | null;
 };
+
+async function loadDistributionState(date: string, shift: AssigningShift) {
+  const rawAssignments = await ReportingAssignment.findAll({
+    where: {
+      status: { [Op.in]: ['assigned', 'completed'] },
+    },
+    include: [
+      {
+        model: ShiftAssignment,
+        as: 'shift',
+        required: false,
+        attributes: ['id', 'date', 'shiftType'],
+      },
+      {
+        model: User,
+        as: 'reportingRadiologist',
+        required: false,
+        attributes: ['id', 'name'],
+      },
+      {
+        model: Requisition,
+        as: 'requisition',
+        attributes: ['id', 'calculatedDueDate'],
+        include: [
+          {
+            model: Visit,
+            as: 'visit',
+            attributes: ['scheduledDateTime'],
+          },
+          {
+            model: RequisitionImagingItem,
+            as: 'imagingItems',
+            attributes: ['rvuValue'],
+          },
+        ],
+      },
+    ],
+    order: [['assignedAt', 'ASC']],
+  });
+
+  const assignments = rawAssignments as Array<
+    ReportingAssignmentWithDetails & {
+      reportingRadiologist?: { id?: number; name?: string } | null;
+    }
+  >;
+  const filtered = filterAssignmentsForDateShift(assignments, date, shift);
+
+  const grouped = new Map<
+    number,
+    {
+      radiologistId: number;
+      radiologistName: string;
+      weight: number;
+      assignedRvu: number;
+      requisitionIds: number[];
+    }
+  >();
+
+  filtered.forEach((a) => {
+    const radiologistId = a.reportingRadiologistId;
+    const radiologistName = a.reportingRadiologist?.name || `User ${radiologistId}`;
+    const requisitionId = a.requisition?.id;
+    if (!requisitionId) return;
+    const rvuValue = a.requisition?.imagingItems?.[0]?.rvuValue ?? 1;
+    if (!grouped.has(radiologistId)) {
+      grouped.set(radiologistId, {
+        radiologistId,
+        radiologistName,
+        weight: 1,
+        assignedRvu: 0,
+        requisitionIds: [],
+      });
+    }
+    const entry = grouped.get(radiologistId)!;
+    if (!entry.requisitionIds.includes(requisitionId)) {
+      entry.requisitionIds.push(requisitionId);
+      entry.assignedRvu += rvuValue;
+    }
+  });
+
+  const participants = Array.from(grouped.values())
+    .sort((a, b) => a.radiologistName.localeCompare(b.radiologistName))
+    .map((p) => ({
+      radiologistId: p.radiologistId,
+      radiologistName: p.radiologistName,
+      weight: p.weight,
+      targetRvu: p.assignedRvu,
+      assignedRvu: p.assignedRvu,
+      assignedRequisitionCount: p.requisitionIds.length,
+      requisitionIds: p.requisitionIds,
+    }));
+
+  return {
+    date,
+    shift,
+    assignedCount: participants.reduce((sum, p) => sum + p.assignedRequisitionCount, 0),
+    totalRvu: participants.reduce((sum, p) => sum + p.assignedRvu, 0),
+    participants,
+    unassignedCount: 0,
+    redistributed: false,
+  };
+}
 
 async function loadRadiologistWorklistRows(userId: number, date: string, shift: AssigningShift) {
   const rawAssignments = await ReportingAssignment.findAll({
@@ -700,6 +803,20 @@ async function loadRadiologistWorklistRows(userId: number, date: string, shift: 
 
   return rows;
 }
+
+router.get('/assigning/distribution-state', requireAuth, requireRole(['admin']), async (req, res) => {
+  const { date, shift } = req.query as { date?: string; shift?: AssigningShift };
+  if (!date || !shift || !['AM', 'PM', 'NIGHT', 'NA'].includes(shift)) {
+    return res.status(400).json({ error: 'date and shift (AM|PM|NIGHT|NA) are required' });
+  }
+  try {
+    const state = await loadDistributionState(date, shift);
+    return res.json(state);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load distribution state' });
+  }
+});
 
 router.get('/assigning/radiologist-worklist', requireAuth, requireRole(['admin']), async (req, res) => {
   const { date, shift, radiologistId } = req.query as {

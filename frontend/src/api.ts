@@ -513,6 +513,27 @@ export async function distributeAssigning(
   return res.json() as Promise<AssigningDistributionResult>;
 }
 
+export async function getAssigningDistributionState(
+  token: string,
+  data: { date: string; shift: 'AM' | 'PM' | 'NIGHT' | 'NA' }
+) {
+  const query = new URLSearchParams({
+    date: data.date,
+    shift: data.shift,
+  });
+  const res = await fetch(
+    `${getApiBase()}/api/requisitions/assigning/distribution-state?${query.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to load existing distribution');
+  }
+  return res.json() as Promise<AssigningDistributionResult>;
+}
+
 export async function downloadAssigningRadiologistPdf(
   token: string,
   data: { date: string; shift: 'AM' | 'PM' | 'NIGHT' | 'NA'; radiologistId: number }
