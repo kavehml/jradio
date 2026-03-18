@@ -164,15 +164,15 @@ export async function createRequisition(
     patientName?: string;
     patientDateOfBirth?: string;
     isNewExternalPatient: boolean;
-    orderingDoctorName: string;
-    orderingClinic: string;
-    site: string;
+    orderingDoctorName?: string;
+    orderingClinic?: string;
+    site?: string;
     dateOfRequest?: string;
     timeDelayPreset?: string;
     hasImagingWithin24h?: boolean;
-    categoryId: number;
+    categoryId?: number;
     modality: string;
-    bodyParts: string[];
+    bodyParts?: string[];
     withContrast?: boolean;
     notes?: string;
     selectedSubCategories?: string[];
@@ -199,15 +199,15 @@ export async function createPublicRequisition(
     patientName?: string;
     patientDateOfBirth?: string;
     isNewExternalPatient: boolean;
-    orderingDoctorName: string;
-    orderingClinic: string;
-    site: string;
+    orderingDoctorName?: string;
+    orderingClinic?: string;
+    site?: string;
     dateOfRequest?: string;
     timeDelayPreset?: string;
     hasImagingWithin24h?: boolean;
-    categoryId: number;
+    categoryId?: number;
     modality: string;
-    bodyParts: string[];
+    bodyParts?: string[];
     withContrast?: boolean;
     notes?: string;
     selectedSubCategories?: string[];
@@ -419,6 +419,26 @@ export interface AssigningDistributionResult {
   redistributed?: boolean;
 }
 
+export interface RadiologistWorklistRow {
+  requisitionId: number;
+  mrn: string;
+  name: string;
+  dob: string;
+  modality: string;
+  category: string;
+  subCategories: string;
+  additionalNotes: string;
+}
+
+export interface RadiologistWorklistResult {
+  radiologistId: number;
+  radiologistName: string;
+  date: string;
+  shift: 'AM' | 'PM' | 'NIGHT' | 'NA';
+  count: number;
+  rows: RadiologistWorklistRow[];
+}
+
 export interface SpecialtyRuleDto {
   id: number;
   modality: string;
@@ -513,6 +533,28 @@ export async function downloadAssigningRadiologistPdf(
     throw new Error((err as { error?: string }).error || 'Failed to generate radiologist PDF');
   }
   return res.blob();
+}
+
+export async function getAssigningRadiologistWorklist(
+  token: string,
+  data: { date: string; shift: 'AM' | 'PM' | 'NIGHT' | 'NA'; radiologistId: number }
+) {
+  const query = new URLSearchParams({
+    date: data.date,
+    shift: data.shift,
+    radiologistId: String(data.radiologistId),
+  });
+  const res = await fetch(
+    `${getApiBase()}/api/requisitions/assigning/radiologist-worklist?${query.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to load radiologist worklist');
+  }
+  return res.json() as Promise<RadiologistWorklistResult>;
 }
 
 export async function updateRequisitionSchedule(

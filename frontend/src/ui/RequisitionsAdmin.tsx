@@ -155,6 +155,7 @@ export const RequisitionsAdmin: React.FC = () => {
   };
 
   const downloadExcelTemplate = async () => {
+    try {
     const columnLetter = (n: number) => {
       let value = n;
       let result = '';
@@ -206,11 +207,19 @@ export const RequisitionsAdmin: React.FC = () => {
       nextListColumn += 1;
     });
 
+    const groupedCategorySubCategories = new Map<string, Set<string>>();
     categories.forEach((category) => {
       const rangeName = toRangeName('CAT_', category.name);
-      const values = Array.from(
-        new Set((subCategoryMap[category.id] || []).map((s) => s.trim()).filter(Boolean))
-      ).sort((a, b) => a.localeCompare(b));
+      if (!groupedCategorySubCategories.has(rangeName)) {
+        groupedCategorySubCategories.set(rangeName, new Set<string>());
+      }
+      (subCategoryMap[category.id] || []).forEach((s) => {
+        const value = s.trim();
+        if (value) groupedCategorySubCategories.get(rangeName)!.add(value);
+      });
+    });
+    Array.from(groupedCategorySubCategories.entries()).forEach(([rangeName, valuesSet]) => {
+      const values = Array.from(valuesSet).sort((a, b) => a.localeCompare(b));
       const letter = columnLetter(nextListColumn);
       listsSheet.getCell(`${letter}1`).value = rangeName;
       if (!values.length) {
@@ -365,6 +374,14 @@ export const RequisitionsAdmin: React.FC = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    } catch (e) {
+      setImportFailed(true);
+      setImportResult(
+        e instanceof Error
+          ? `Failed to generate template: ${e.message}`
+          : 'Failed to generate template file.'
+      );
+    }
   };
 
   const handleImportExcel = async () => {

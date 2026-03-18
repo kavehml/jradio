@@ -307,17 +307,9 @@ function validateAndBuildParams(body: {
   notes?: string;
   selectedSubCategories?: string[];
 }) {
-  if (
-    !body.patientIdOrTempLabel ||
-    !body.orderingDoctorName ||
-    !body.orderingClinic ||
-    !body.site ||
-    body.categoryId == null ||
-    !body.modality
-  ) {
+  if (!body.patientIdOrTempLabel || !body.patientName || !body.patientDateOfBirth || !body.modality) {
     return {
-      error:
-        'Missing required fields: patientIdOrTempLabel, orderingDoctorName, orderingClinic, site, categoryId, modality',
+      error: 'Missing required fields: patientIdOrTempLabel, patientName, patientDateOfBirth, modality',
     } as const;
   }
 
@@ -327,10 +319,11 @@ function validateAndBuildParams(body: {
     ...(body.patientDateOfBirth !== undefined &&
       body.patientDateOfBirth !== '' && { patientDateOfBirth: body.patientDateOfBirth }),
     isNewExternalPatient: !!body.isNewExternalPatient,
-    orderingDoctorName: body.orderingDoctorName,
-    orderingClinic: body.orderingClinic,
-    site: body.site,
-    categoryId: body.categoryId,
+    ...(body.orderingDoctorName !== undefined &&
+      body.orderingDoctorName !== '' && { orderingDoctorName: body.orderingDoctorName }),
+    ...(body.orderingClinic !== undefined && body.orderingClinic !== '' && { orderingClinic: body.orderingClinic }),
+    ...(body.site !== undefined && body.site !== '' && { site: body.site }),
+    ...(body.categoryId !== undefined && body.categoryId !== null && { categoryId: body.categoryId }),
     modality: body.modality,
     bodyParts: Array.isArray(body.bodyParts) ? body.bodyParts : [body.modality],
     ...(body.dateOfRequest !== undefined && body.dateOfRequest !== '' && { dateOfRequest: body.dateOfRequest }),
@@ -620,6 +613,125 @@ router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async 
   }
 });
 
+interface RadiologistWorklistRow {
+  requisitionId: number;
+  mrn: string;
+  name: string;
+  dob: string;
+  modality: string;
+  category: string;
+  subCategories: string;
+  additionalNotes: string;
+}
+
+type ReportingAssignmentWithDetails = ReportingAssignment & {
+  shift?: { date?: Date | string | null; shiftType?: ShiftType | null } | null;
+  requisition?: {
+    id: number;
+    patientIdOrTempLabel: string;
+    patientName?: string | null;
+    patientDateOfBirth?: Date | string | null;
+    calculatedDueDate?: Date | string | null;
+    visit?: { visitNumber?: string | null; scheduledDateTime?: Date | string | null } | null;
+    imagingItems?: Array<{
+      modality?: string | null;
+      specialNotes?: string | null;
+      category?: { name?: string | null } | null;
+    }>;
+  } | null;
+};
+
+async function loadRadiologistWorklistRows(userId: number, date: string, shift: AssigningShift) {
+  const rawAssignments = await ReportingAssignment.findAll({
+    where: {
+      reportingRadiologistId: userId,
+      status: { [Op.in]: ['assigned', 'completed'] },
+    },
+    include: [
+      {
+        model: ShiftAssignment,
+        as: 'shift',
+        required: false,
+        attributes: ['id', 'date', 'shiftType'],
+      },
+      {
+        model: Requisition,
+        as: 'requisition',
+        attributes: ['id', 'patientIdOrTempLabel', 'patientName', 'patientDateOfBirth', 'calculatedDueDate'],
+        include: [
+          {
+            model: Visit,
+            as: 'visit',
+            attributes: ['visitNumber', 'scheduledDateTime'],
+          },
+          {
+            model: RequisitionImagingItem,
+            as: 'imagingItems',
+            attributes: ['modality', 'specialNotes'],
+            include: [{ model: ImagingCategory, as: 'category', attributes: ['name'] }],
+          },
+        ],
+      },
+    ],
+    order: [['assignedAt', 'ASC']],
+  });
+
+  const assignments = rawAssignments as ReportingAssignmentWithDetails[];
+  const filtered = filterAssignmentsForDateShift(assignments, date, shift);
+
+  const rows = filtered
+    .map((assignment) => {
+      const reqn = assignment.requisition;
+      if (!reqn) return null;
+      const item = reqn.imagingItems?.[0];
+      const parsedSubCategories = parseSubCategoriesFromNotes(item?.specialNotes);
+      return {
+        requisitionId: reqn.id,
+        mrn: reqn.patientIdOrTempLabel || '—',
+        name: reqn.patientName?.trim() || '—',
+        dob: formatDob(reqn.patientDateOfBirth),
+        modality: item?.modality || '—',
+        category: item?.category?.name || '—',
+        subCategories: parsedSubCategories.join(', ') || '—',
+        additionalNotes: stripManagedPrefixes(item?.specialNotes) || '—',
+      };
+    })
+    .filter(Boolean) as RadiologistWorklistRow[];
+
+  return rows;
+}
+
+router.get('/assigning/radiologist-worklist', requireAuth, requireRole(['admin']), async (req, res) => {
+  const { date, shift, radiologistId } = req.query as {
+    date?: string;
+    shift?: AssigningShift;
+    radiologistId?: string;
+  };
+  if (!date || !shift || !['AM', 'PM', 'NIGHT', 'NA'].includes(shift)) {
+    return res.status(400).json({ error: 'date and shift (AM|PM|NIGHT|NA) are required' });
+  }
+  const userId = Number(radiologistId);
+  if (!Number.isInteger(userId)) {
+    return res.status(400).json({ error: 'radiologistId is required' });
+  }
+  try {
+    const user = await User.findByPk(userId, { attributes: ['id', 'name'] });
+    if (!user) return res.status(404).json({ error: 'Radiologist not found' });
+    const rows = await loadRadiologistWorklistRows(userId, date, shift);
+    return res.json({
+      radiologistId: user.id,
+      radiologistName: user.name,
+      date,
+      shift,
+      count: rows.length,
+      rows,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load radiologist worklist' });
+  }
+});
+
 router.get('/assigning/radiologist-pdf', requireAuth, requireRole(['admin']), async (req, res) => {
   const { date, shift, radiologistId } = req.query as {
     date?: string;
@@ -633,91 +745,10 @@ router.get('/assigning/radiologist-pdf', requireAuth, requireRole(['admin']), as
   if (!Number.isInteger(userId)) {
     return res.status(400).json({ error: 'radiologistId is required' });
   }
-
   try {
     const user = await User.findByPk(userId, { attributes: ['id', 'name'] });
     if (!user) return res.status(404).json({ error: 'Radiologist not found' });
-
-    const rawAssignments = await ReportingAssignment.findAll({
-      where: {
-        reportingRadiologistId: userId,
-        status: { [Op.in]: ['assigned', 'completed'] },
-      },
-      include: [
-        {
-          model: ShiftAssignment,
-          as: 'shift',
-          required: false,
-          attributes: ['id', 'date', 'shiftType'],
-        },
-        {
-          model: Requisition,
-          as: 'requisition',
-          attributes: ['id', 'patientIdOrTempLabel', 'patientName', 'patientDateOfBirth', 'calculatedDueDate'],
-          include: [
-            {
-              model: Visit,
-              as: 'visit',
-              attributes: ['visitNumber', 'scheduledDateTime'],
-            },
-            {
-              model: RequisitionImagingItem,
-              as: 'imagingItems',
-              attributes: ['modality', 'specialNotes'],
-              include: [{ model: ImagingCategory, as: 'category', attributes: ['name'] }],
-            },
-          ],
-        },
-      ],
-      order: [['assignedAt', 'ASC']],
-    });
-
-    const assignments = rawAssignments as Array<
-      ReportingAssignment & {
-        shift?: { date?: Date | string | null; shiftType?: ShiftType | null } | null;
-        requisition?: {
-          id: number;
-          patientIdOrTempLabel: string;
-          patientName?: string | null;
-          patientDateOfBirth?: Date | string | null;
-          calculatedDueDate?: Date | string | null;
-          visit?: { visitNumber?: string | null; scheduledDateTime?: Date | string | null } | null;
-          imagingItems?: Array<{
-            modality?: string | null;
-            specialNotes?: string | null;
-            category?: { name?: string | null } | null;
-          }>;
-        } | null;
-      }
-    >;
-
-    const filtered = filterAssignmentsForDateShift(assignments, date, shift);
-
-    const rows = filtered
-      .map((assignment) => {
-        const reqn = assignment.requisition;
-        if (!reqn) return null;
-        const item = reqn.imagingItems?.[0];
-        const parsedSubCategories = parseSubCategoriesFromNotes(item?.specialNotes);
-        return {
-          mrn: reqn.patientIdOrTempLabel || '—',
-          name: reqn.patientName?.trim() || '—',
-          dob: formatDob(reqn.patientDateOfBirth),
-          modality: item?.modality || '—',
-          category: item?.category?.name || '—',
-          subCategories: parsedSubCategories.join(', ') || '—',
-          additionalNotes: stripManagedPrefixes(item?.specialNotes) || '—',
-        };
-      })
-      .filter(Boolean) as Array<{
-      mrn: string;
-      name: string;
-      dob: string;
-      modality: string;
-      category: string;
-      subCategories: string;
-      additionalNotes: string;
-    }>;
+    const rows = await loadRadiologistWorklistRows(userId, date, shift);
 
     const safeDate = date.replace(/[^0-9-]/g, '');
     const safeShift = shift.toLowerCase();

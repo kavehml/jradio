@@ -413,8 +413,11 @@ export const PublicRequisitionForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCategory || !modality) {
-      setMessage({ type: 'err', text: 'Please select modality and imaging category.' });
+    if (!modality || !patientId.trim() || !patientName.trim() || !patientDob) {
+      setMessage({
+        type: 'err',
+        text: 'Required fields: Patient name, MRN/Patient ID, Patient DOB, and modality.',
+      });
       return;
     }
     setMessage(null);
@@ -431,9 +434,9 @@ export const PublicRequisitionForm: React.FC = () => {
         dateOfRequest: dateOfRequest || undefined,
         timeDelayPreset: timeDelayPreset || undefined,
         hasImagingWithin24h,
-        categoryId: selectedCategory.id,
+        categoryId: selectedCategory?.id ?? undefined,
         modality,
-        bodyParts: [selectedCategory.bodyPart],
+        bodyParts: selectedCategory ? [selectedCategory.bodyPart] : [modality],
         selectedSubCategories: subCategories,
         withContrast: false,
         notes:
@@ -477,7 +480,7 @@ export const PublicRequisitionForm: React.FC = () => {
         <p>Loading categories…</p>
       ) : (
         <>
-          <h3 style={{ marginBottom: '0.5rem' }}>Modality</h3>
+          <h3 style={{ marginBottom: '0.5rem' }}>Modality *</h3>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             {['X-ray', 'CT', 'MRI', 'US', 'PET'].map((m) => (
               <button
@@ -667,16 +670,16 @@ export const PublicRequisitionForm: React.FC = () => {
           </div>
         )}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient identifier (MRN or temp label)</span>
+          <span>Patient identifier (MRN or temp label) *</span>
           <input type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient name</span>
-          <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+          <span>Patient name *</span>
+          <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient DOB</span>
-          <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} />
+          <span>Patient DOB *</span>
+          <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input
@@ -692,7 +695,6 @@ export const PublicRequisitionForm: React.FC = () => {
             type="text"
             value={orderingDoctor}
             onChange={(e) => setOrderingDoctor(e.target.value)}
-            required
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -713,7 +715,6 @@ export const PublicRequisitionForm: React.FC = () => {
             type="text"
             value={orderingClinic}
             onChange={(e) => setOrderingClinic(e.target.value)}
-            required
             placeholder="Or type clinic name…"
           />
         </label>
@@ -731,7 +732,6 @@ export const PublicRequisitionForm: React.FC = () => {
             type="text"
             value={site}
             onChange={(e) => setSite(e.target.value)}
-            required
             placeholder="Or type site/location…"
           />
         </label>
@@ -764,7 +764,7 @@ export const PublicRequisitionForm: React.FC = () => {
         </label>
         <button
           type="submit"
-          disabled={submitting || !selectedCategory}
+          disabled={submitting}
           style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', cursor: submitting ? 'not-allowed' : 'pointer' }}
         >
           {submitting ? 'Submitting…' : 'Submit requisition'}

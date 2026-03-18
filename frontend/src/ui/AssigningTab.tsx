@@ -4,9 +4,11 @@ import {
   AssigningSummary,
   downloadAssigningRadiologistPdf,
   distributeAssigning,
+  getAssigningRadiologistWorklist,
   getAssigningSummary,
   getShiftCoverage,
   getUsers,
+  RadiologistWorklistResult,
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -33,6 +35,8 @@ export const AssigningTab: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [distributionResult, setDistributionResult] = useState<AssigningDistributionResult | null>(null);
+  const [activeWorklist, setActiveWorklist] = useState<RadiologistWorklistResult | null>(null);
+  const [loadingWorklistFor, setLoadingWorklistFor] = useState<number | null>(null);
 
   const loadAssigningContext = async () => {
     if (!token) return;
@@ -154,6 +158,20 @@ export const AssigningTab: React.FC = () => {
       setError(e instanceof Error ? e.message : 'Failed to download PDF');
     } finally {
       setDownloadingPdfFor(null);
+    }
+  };
+
+  const handleViewSchedule = async (radiologistId: number) => {
+    if (!token) return;
+    setLoadingWorklistFor(radiologistId);
+    setError(null);
+    try {
+      const data = await getAssigningRadiologistWorklist(token, { date, shift, radiologistId });
+      setActiveWorklist(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load worklist');
+    } finally {
+      setLoadingWorklistFor(null);
     }
   };
 
@@ -306,6 +324,7 @@ export const AssigningTab: React.FC = () => {
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Target RVU</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Assigned RVU</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Assigned cases</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>View schedule</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Worklist PDF</th>
                 </tr>
               </thead>
@@ -320,6 +339,15 @@ export const AssigningTab: React.FC = () => {
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
                       <button
                         type="button"
+                        disabled={loadingWorklistFor === p.radiologistId}
+                        onClick={() => void handleViewSchedule(p.radiologistId)}
+                      >
+                        {loadingWorklistFor === p.radiologistId ? 'Loading...' : 'View list'}
+                      </button>
+                    </td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                      <button
+                        type="button"
                         disabled={downloadingPdfFor === p.radiologistId}
                         onClick={() => void handleDownloadPdf(p.radiologistId, p.radiologistName)}
                       >
@@ -328,6 +356,49 @@ export const AssigningTab: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeWorklist && (
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem' }}>
+          <strong>
+            Worklist on page: {activeWorklist.radiologistName} ({activeWorklist.count})
+          </strong>
+          <div style={{ marginTop: 8, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>MRN</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>DOB</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Modality</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Sub-categories</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeWorklist.rows.map((r) => (
+                  <tr key={r.requisitionId}>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.mrn}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.name}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.dob}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.modality}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.category}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.subCategories}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.additionalNotes}</td>
+                  </tr>
+                ))}
+                {activeWorklist.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '0.5rem', color: '#94a3b8' }}>
+                      No requisitions assigned for this radiologist in the selected date/shift.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

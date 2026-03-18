@@ -16,7 +16,8 @@ import {
 } from '../api';
 
 export const AdminDashboard: React.FC = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const canAddUsers = user?.role === 'admin';
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -240,31 +241,35 @@ export const AdminDashboard: React.FC = () => {
             {message.text}
           </div>
         )}
-        <form onSubmit={handleAddUser} style={{ display: 'grid', gap: '0.75rem', maxWidth: 400 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Name</span>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Email</span>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Password</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Role</span>
-            <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'radiologist' | 'clerical')}>
-              <option value="radiologist">Radiologist</option>
-              <option value="clerical">Clerical</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
-          <button type="submit" style={{ padding: '0.5rem 1rem', cursor: 'pointer', marginTop: '0.25rem' }}>
-            Add user
-          </button>
-        </form>
+        {!canAddUsers ? (
+          <p style={{ margin: 0, color: '#64748b' }}>Only admins can add users.</p>
+        ) : (
+          <form onSubmit={handleAddUser} style={{ display: 'grid', gap: '0.75rem', maxWidth: 400 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Name</span>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Email</span>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Password</span>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Role</span>
+              <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'radiologist' | 'clerical')}>
+                <option value="radiologist">Radiologist</option>
+                <option value="clerical">Clerical</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <button type="submit" style={{ padding: '0.5rem 1rem', cursor: 'pointer', marginTop: '0.25rem' }}>
+              Add user
+            </button>
+          </form>
+        )}
       </div>
 
       <div

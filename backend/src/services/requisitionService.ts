@@ -39,9 +39,10 @@ function computeRvu(bodyParts: string[], modality: string): number {
 
 export async function resolveRequiredSubspecialties(params: {
   modality: string;
-  categoryId: number;
+  categoryId?: number | null;
   selectedSubCategories?: string[];
 }) {
+  if (!params.categoryId) return ['general'];
   const category = await ImagingCategory.findByPk(params.categoryId, {
     attributes: ['name'],
   });
@@ -70,15 +71,15 @@ export async function createRequisition(params: {
   patientName?: string;
   patientDateOfBirth?: string;
   isNewExternalPatient: boolean;
-  orderingDoctorName: string;
-  orderingClinic: string;
-  site: string;
+  orderingDoctorName?: string;
+  orderingClinic?: string;
+  site?: string;
   dateOfRequest?: string;
   timeDelayPreset?: string;
   hasImagingWithin24h?: boolean;
-  categoryId: number;
+  categoryId?: number | null;
   modality: string;
-  bodyParts: string[];
+  bodyParts?: string[];
   withContrast?: boolean;
   notes?: string;
   selectedSubCategories?: string[];
@@ -107,24 +108,25 @@ export async function createRequisition(params: {
         patientName: params.patientName?.trim() || null,
         patientDateOfBirth: params.patientDateOfBirth ? new Date(params.patientDateOfBirth) : null,
         isNewExternalPatient: params.isNewExternalPatient,
-        orderingDoctorName: params.orderingDoctorName,
-        orderingClinic: params.orderingClinic,
-        site: params.site,
+        orderingDoctorName: params.orderingDoctorName?.trim() || 'Unknown',
+        orderingClinic: params.orderingClinic?.trim() || 'Unknown',
+        site: params.site?.trim() || 'Unknown',
         status: 'pending_approval',
       },
       { transaction: tx }
     );
 
-    const rvuValue = computeRvu(params.bodyParts, params.modality);
+    const bodyParts = Array.isArray(params.bodyParts) && params.bodyParts.length ? params.bodyParts : [params.modality];
+    const rvuValue = computeRvu(bodyParts, params.modality);
     await RequisitionImagingItem.create(
       {
         requisitionId: requisition.id,
         modality: params.modality,
-        bodyParts: params.bodyParts,
+        bodyParts,
         withContrast: params.withContrast ?? false,
         specialNotes: params.notes ?? null,
         rvuValue,
-        categoryId: params.categoryId,
+        categoryId: params.categoryId ?? null,
       },
       { transaction: tx }
     );
@@ -135,14 +137,14 @@ export async function createRequisition(params: {
         requisitionId: requisition.id,
         visitNumber,
         scheduledDateTime: null,
-        location: params.site,
+        location: params.site?.trim() || 'Unknown',
       },
       { transaction: tx }
     );
 
     const requiredSubspecialties = await resolveRequiredSubspecialties({
       modality: params.modality,
-      categoryId: params.categoryId,
+      ...(params.categoryId !== undefined && { categoryId: params.categoryId }),
       ...(params.selectedSubCategories !== undefined && {
         selectedSubCategories: params.selectedSubCategories,
       }),

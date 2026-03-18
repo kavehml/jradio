@@ -445,8 +445,11 @@ export const ClericalIntake: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedCategory || !modality) {
-      setMessage({ type: 'err', text: 'Please select modality and imaging category.' });
+    if (!token || !modality || !patientId.trim() || !patientName.trim() || !patientDob) {
+      setMessage({
+        type: 'err',
+        text: 'Required fields: Patient name, MRN/Patient ID, Patient DOB, and modality.',
+      });
       return;
     }
     setMessage(null);
@@ -463,9 +466,9 @@ export const ClericalIntake: React.FC = () => {
         dateOfRequest: dateOfRequest || undefined,
         timeDelayPreset: timeDelayPreset || undefined,
         hasImagingWithin24h,
-        categoryId: selectedCategory.id,
+        categoryId: selectedCategory?.id ?? undefined,
         modality,
-        bodyParts: [selectedCategory.bodyPart],
+        bodyParts: selectedCategory ? [selectedCategory.bodyPart] : [modality],
         selectedSubCategories: subCategories,
         withContrast: false,
         notes:
@@ -509,7 +512,7 @@ export const ClericalIntake: React.FC = () => {
         <p>Loading categories…</p>
       ) : (
         <>
-          <h3 style={{ marginBottom: '0.5rem' }}>Modality</h3>
+          <h3 style={{ marginBottom: '0.5rem' }}>Modality *</h3>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             {['X-ray', 'CT', 'MRI', 'US', 'PET'].map((m) => (
               <button
@@ -698,16 +701,16 @@ export const ClericalIntake: React.FC = () => {
           </div>
         )}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>MRN / Patient ID or temp label</span>
+          <span>MRN / Patient ID or temp label *</span>
           <input type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient name</span>
-          <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+          <span>Patient name *</span>
+          <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient DOB</span>
-          <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} />
+          <span>Patient DOB *</span>
+          <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input type="checkbox" checked={isNewExternal} onChange={(e) => setIsNewExternal(e.target.checked)} />
@@ -715,7 +718,7 @@ export const ClericalIntake: React.FC = () => {
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Ordering doctor</span>
-          <input type="text" value={orderingDoctor} onChange={(e) => setOrderingDoctor(e.target.value)} required />
+          <input type="text" value={orderingDoctor} onChange={(e) => setOrderingDoctor(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>Clinic</span>
@@ -735,7 +738,6 @@ export const ClericalIntake: React.FC = () => {
             type="text"
             value={orderingClinic}
             onChange={(e) => setOrderingClinic(e.target.value)}
-            required
             placeholder="Or type clinic name…"
           />
         </label>
@@ -753,7 +755,6 @@ export const ClericalIntake: React.FC = () => {
             type="text"
             value={site}
             onChange={(e) => setSite(e.target.value)}
-            required
             placeholder="Or type site/location…"
           />
         </label>
@@ -780,7 +781,7 @@ export const ClericalIntake: React.FC = () => {
           <span>Additional notes</span>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </label>
-        <button type="submit" disabled={submitting || !selectedCategory} style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', cursor: submitting ? 'not-allowed' : 'pointer' }}>
+        <button type="submit" disabled={submitting} style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', cursor: submitting ? 'not-allowed' : 'pointer' }}>
           {submitting ? 'Saving…' : 'Save requisition'}
         </button>
       </form>
