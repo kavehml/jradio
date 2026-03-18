@@ -10,6 +10,7 @@ import {
   getShiftCoverage,
   getUsers,
   RadiologistWorklistResult,
+  updateAssigningReportingStatus,
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -38,6 +39,7 @@ export const AssigningTab: React.FC = () => {
   const [distributionResult, setDistributionResult] = useState<AssigningDistributionResult | null>(null);
   const [activeWorklist, setActiveWorklist] = useState<RadiologistWorklistResult | null>(null);
   const [loadingWorklistFor, setLoadingWorklistFor] = useState<number | null>(null);
+  const [savingReportFor, setSavingReportFor] = useState<number | null>(null);
 
   const loadAssigningContext = async () => {
     if (!token) return;
@@ -114,6 +116,10 @@ export const AssigningTab: React.FC = () => {
     () => allRadiologists.filter((u) => !participants.some((p) => p.radiologistId === u.id)),
     [allRadiologists, participants]
   );
+  const activeWorklistCompletedCount = useMemo(
+    () => (activeWorklist ? activeWorklist.rows.filter((r) => r.isCompleted).length : 0),
+    [activeWorklist]
+  );
 
   const addRadiologist = () => {
     if (!selectedRadiologistId) return;
@@ -188,6 +194,31 @@ export const AssigningTab: React.FC = () => {
       setError(e instanceof Error ? e.message : 'Failed to load worklist');
     } finally {
       setLoadingWorklistFor(null);
+    }
+  };
+
+  const handleToggleReported = async (assignmentId: number, completed: boolean) => {
+    if (!token || !activeWorklist) return;
+    setSavingReportFor(assignmentId);
+    setError(null);
+    try {
+      await updateAssigningReportingStatus(token, assignmentId, completed);
+      setActiveWorklist((prev) =>
+        prev
+          ? {
+              ...prev,
+              rows: prev.rows.map((r) =>
+                r.assignmentId === assignmentId ? { ...r, isCompleted: completed } : r
+              ),
+            }
+          : prev
+      );
+      const refreshedSummary = await getAssigningSummary(token, date, shift);
+      setSummary(refreshedSummary);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update reporting status');
+    } finally {
+      setSavingReportFor(null);
     }
   };
 
@@ -383,6 +414,9 @@ export const AssigningTab: React.FC = () => {
           <strong>
             Worklist on page: {activeWorklist.radiologistName} ({activeWorklist.count})
           </strong>
+          <div style={{ marginTop: 6, color: '#475569', fontSize: '0.92rem' }}>
+            Done / Total: {activeWorklistCompletedCount} / {activeWorklist.rows.length}
+          </div>
           <div style={{ marginTop: 8, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
@@ -394,6 +428,7 @@ export const AssigningTab: React.FC = () => {
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Sub-categories</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Notes</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Reported</th>
                 </tr>
               </thead>
               <tbody>
@@ -406,11 +441,19 @@ export const AssigningTab: React.FC = () => {
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.category}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.subCategories}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.additionalNotes}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                      <input
+                        type="checkbox"
+                        checked={r.isCompleted}
+                        disabled={savingReportFor === r.assignmentId}
+                        onChange={(e) => void handleToggleReported(r.assignmentId, e.target.checked)}
+                      />
+                    </td>
                   </tr>
                 ))}
                 {activeWorklist.rows.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: '0.5rem', color: '#94a3b8' }}>
+                    <td colSpan={8} style={{ padding: '0.5rem', color: '#94a3b8' }}>
                       No requisitions assigned for this radiologist in the selected date/shift.
                     </td>
                   </tr>

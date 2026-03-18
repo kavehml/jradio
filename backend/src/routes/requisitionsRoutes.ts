@@ -614,6 +614,7 @@ router.post('/assigning/distribute', requireAuth, requireRole(['admin']), async 
 });
 
 interface RadiologistWorklistRow {
+  assignmentId: number;
   requisitionId: number;
   mrn: string;
   name: string;
@@ -622,6 +623,7 @@ interface RadiologistWorklistRow {
   category: string;
   subCategories: string;
   additionalNotes: string;
+  isCompleted: boolean;
 }
 
 type ReportingAssignmentWithDetails = ReportingAssignment & {
@@ -782,27 +784,51 @@ async function loadRadiologistWorklistRows(userId: number, date: string, shift: 
   const assignments = rawAssignments as ReportingAssignmentWithDetails[];
   const filtered = filterAssignmentsForDateShift(assignments, date, shift);
 
-  const rows = filtered
-    .map((assignment) => {
-      const reqn = assignment.requisition;
-      if (!reqn) return null;
-      const item = reqn.imagingItems?.[0];
-      const parsedSubCategories = parseSubCategoriesFromNotes(item?.specialNotes);
-      return {
-        requisitionId: reqn.id,
-        mrn: reqn.patientIdOrTempLabel || '—',
-        name: reqn.patientName?.trim() || '—',
-        dob: formatDob(reqn.patientDateOfBirth),
-        modality: item?.modality || '—',
-        category: item?.category?.name || '—',
-        subCategories: parsedSubCategories.join(', ') || '—',
-        additionalNotes: stripManagedPrefixes(item?.specialNotes) || '—',
-      };
-    })
-    .filter(Boolean) as RadiologistWorklistRow[];
+  const rowsByRequisitionId = new Map<number, RadiologistWorklistRow>();
+  filtered.forEach((assignment) => {
+    const reqn = assignment.requisition;
+    if (!reqn) return;
+    const item = reqn.imagingItems?.[0];
+    const parsedSubCategories = parseSubCategoriesFromNotes(item?.specialNotes);
+    rowsByRequisitionId.set(reqn.id, {
+      assignmentId: assignment.id,
+      requisitionId: reqn.id,
+      mrn: reqn.patientIdOrTempLabel || '—',
+      name: reqn.patientName?.trim() || '—',
+      dob: formatDob(reqn.patientDateOfBirth),
+      modality: item?.modality || '—',
+      category: item?.category?.name || '—',
+      subCategories: parsedSubCategories.join(', ') || '—',
+      additionalNotes: stripManagedPrefixes(item?.specialNotes) || '—',
+      isCompleted: assignment.status === 'completed',
+    });
+  });
 
-  return rows;
+  return Array.from(rowsByRequisitionId.values()).sort((a, b) => a.requisitionId - b.requisitionId);
 }
+
+router.patch('/assigning/reporting-status/:assignmentId', requireAuth, requireRole(['admin', 'radiologist']), async (req, res) => {
+  const assignmentId = Number(req.params.assignmentId);
+  const { completed } = req.body as { completed?: boolean };
+  if (!Number.isInteger(assignmentId) || typeof completed !== 'boolean') {
+    return res.status(400).json({ error: 'assignmentId and completed(boolean) are required' });
+  }
+  try {
+    const assignment = await ReportingAssignment.findByPk(assignmentId);
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+    assignment.status = completed ? 'completed' : 'assigned';
+    assignment.completedAt = completed ? new Date() : null;
+    await assignment.save();
+    return res.json({
+      assignmentId: assignment.id,
+      status: assignment.status,
+      completedAt: assignment.completedAt,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update reporting status' });
+  }
+});
 
 router.get('/assigning/distribution-state', requireAuth, requireRole(['admin']), async (req, res) => {
   const { date, shift } = req.query as { date?: string; shift?: AssigningShift };

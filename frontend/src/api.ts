@@ -420,6 +420,7 @@ export interface AssigningDistributionResult {
 }
 
 export interface RadiologistWorklistRow {
+  assignmentId: number;
   requisitionId: number;
   mrn: string;
   name: string;
@@ -428,6 +429,7 @@ export interface RadiologistWorklistRow {
   category: string;
   subCategories: string;
   additionalNotes: string;
+  isCompleted: boolean;
 }
 
 export interface RadiologistWorklistResult {
@@ -576,6 +578,26 @@ export async function getAssigningRadiologistWorklist(
     throw new Error((err as { error?: string }).error || 'Failed to load radiologist worklist');
   }
   return res.json() as Promise<RadiologistWorklistResult>;
+}
+
+export async function updateAssigningReportingStatus(
+  token: string,
+  assignmentId: number,
+  completed: boolean
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/assigning/reporting-status/${assignmentId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ completed }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update reporting status');
+  }
+  return res.json() as Promise<{ assignmentId: number; status: string; completedAt: string | null }>;
 }
 
 export async function updateRequisitionSchedule(
