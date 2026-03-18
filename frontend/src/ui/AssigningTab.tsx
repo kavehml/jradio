@@ -424,11 +424,13 @@ export const AssigningTab: React.FC = () => {
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>MRN</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Name</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>DOB</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+                    Reported
+                  </th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Modality</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Sub-categories</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Notes</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Reported</th>
                 </tr>
               </thead>
               <tbody>
@@ -437,10 +439,6 @@ export const AssigningTab: React.FC = () => {
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.mrn}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.name}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.dob}</td>
-                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.modality}</td>
-                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.category}</td>
-                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.subCategories}</td>
-                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.additionalNotes}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
                       <input
                         type="checkbox"
@@ -449,6 +447,10 @@ export const AssigningTab: React.FC = () => {
                         onChange={(e) => void handleToggleReported(r.assignmentId, e.target.checked)}
                       />
                     </td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.modality}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.category}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.subCategories}</td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.additionalNotes}</td>
                   </tr>
                 ))}
                 {activeWorklist.rows.length === 0 && (
