@@ -181,7 +181,7 @@ export const RequisitionsAdmin: React.FC = () => {
       listsSheet.getCell(`A${idx + 2}`).value = value;
     });
     const modalityListEnd = Math.max(modalityValues.length + 1, 2);
-    workbook.definedNames.add('MODALITY_LIST', `Lists!$A$2:$A$${modalityListEnd}`);
+    workbook.definedNames.add(`Lists!$A$2:$A$${modalityListEnd}`, 'MODALITY_LIST');
 
     // Build named ranges for cascading dropdowns:
     // - MOD_<MODALITY> points to that modality's categories
@@ -203,7 +203,7 @@ export const RequisitionsAdmin: React.FC = () => {
         });
       }
       const end = Math.max(modalityCategories.length + 1, 2);
-      workbook.definedNames.add(rangeName, `Lists!$${letter}$2:$${letter}$${end}`);
+      workbook.definedNames.add(`Lists!$${letter}$2:$${letter}$${end}`, rangeName);
       nextListColumn += 1;
     });
 
@@ -230,7 +230,7 @@ export const RequisitionsAdmin: React.FC = () => {
         });
       }
       const end = Math.max(values.length + 1, 2);
-      workbook.definedNames.add(rangeName, `Lists!$${letter}$2:$${letter}$${end}`);
+      workbook.definedNames.add(`Lists!$${letter}$2:$${letter}$${end}`, rangeName);
       nextListColumn += 1;
     });
 
