@@ -10,6 +10,7 @@ import {
   getShiftCoverage,
   getUsers,
   RadiologistWorklistResult,
+  updateAssigningUrgentFindingsStatus,
   updateAssigningReportingStatus,
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
@@ -40,6 +41,7 @@ export const AssigningTab: React.FC = () => {
   const [activeWorklist, setActiveWorklist] = useState<RadiologistWorklistResult | null>(null);
   const [loadingWorklistFor, setLoadingWorklistFor] = useState<number | null>(null);
   const [savingReportFor, setSavingReportFor] = useState<number | null>(null);
+  const [savingUrgentFor, setSavingUrgentFor] = useState<number | null>(null);
 
   const loadAssigningContext = async () => {
     if (!token) return;
@@ -219,6 +221,29 @@ export const AssigningTab: React.FC = () => {
       setError(e instanceof Error ? e.message : 'Failed to update reporting status');
     } finally {
       setSavingReportFor(null);
+    }
+  };
+
+  const handleToggleUrgentFindings = async (assignmentId: number, urgentFindings: boolean) => {
+    if (!token || !activeWorklist) return;
+    setSavingUrgentFor(assignmentId);
+    setError(null);
+    try {
+      await updateAssigningUrgentFindingsStatus(token, assignmentId, urgentFindings);
+      setActiveWorklist((prev) =>
+        prev
+          ? {
+              ...prev,
+              rows: prev.rows.map((r) =>
+                r.assignmentId === assignmentId ? { ...r, hasUrgentFindings: urgentFindings } : r
+              ),
+            }
+          : prev
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update urgent findings status');
+    } finally {
+      setSavingUrgentFor(null);
     }
   };
 
@@ -427,6 +452,9 @@ export const AssigningTab: React.FC = () => {
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
                     Reported
                   </th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+                    Urgent findings
+                  </th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Modality</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Sub-categories</th>
@@ -447,6 +475,16 @@ export const AssigningTab: React.FC = () => {
                         onChange={(e) => void handleToggleReported(r.assignmentId, e.target.checked)}
                       />
                     </td>
+                    <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                      <input
+                        type="checkbox"
+                        checked={r.hasUrgentFindings}
+                        disabled={savingUrgentFor === r.assignmentId}
+                        onChange={(e) =>
+                          void handleToggleUrgentFindings(r.assignmentId, e.target.checked)
+                        }
+                      />
+                    </td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.modality}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.category}</td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{r.subCategories}</td>
@@ -455,7 +493,7 @@ export const AssigningTab: React.FC = () => {
                 ))}
                 {activeWorklist.rows.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: '0.5rem', color: '#94a3b8' }}>
+                    <td colSpan={9} style={{ padding: '0.5rem', color: '#94a3b8' }}>
                       No requisitions assigned for this radiologist in the selected date/shift.
                     </td>
                   </tr>

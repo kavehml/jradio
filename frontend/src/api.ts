@@ -430,6 +430,7 @@ export interface RadiologistWorklistRow {
   subCategories: string;
   additionalNotes: string;
   isCompleted: boolean;
+  hasUrgentFindings: boolean;
 }
 
 export interface RadiologistWorklistResult {
@@ -598,6 +599,26 @@ export async function updateAssigningReportingStatus(
     throw new Error((err as { error?: string }).error || 'Failed to update reporting status');
   }
   return res.json() as Promise<{ assignmentId: number; status: string; completedAt: string | null }>;
+}
+
+export async function updateAssigningUrgentFindingsStatus(
+  token: string,
+  assignmentId: number,
+  urgentFindings: boolean
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/assigning/urgent-findings/${assignmentId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ urgentFindings }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update urgent findings status');
+  }
+  return res.json() as Promise<{ assignmentId: number; urgentFindings: boolean }>;
 }
 
 export async function updateRequisitionSchedule(

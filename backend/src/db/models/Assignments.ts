@@ -84,10 +84,11 @@ interface ReportingAssignmentAttributes {
   assignedAt: Date;
   completedAt: Date | null;
   status: AssignmentStatus;
+  urgentFindings: boolean;
 }
 
 interface ReportingAssignmentCreationAttributes
-  extends Optional<ReportingAssignmentAttributes, 'id' | 'shiftId' | 'completedAt' | 'status'> {}
+  extends Optional<ReportingAssignmentAttributes, 'id' | 'shiftId' | 'completedAt' | 'status' | 'urgentFindings'> {}
 
 export class ReportingAssignment
   extends Model<ReportingAssignmentAttributes, ReportingAssignmentCreationAttributes>
@@ -100,6 +101,7 @@ export class ReportingAssignment
   public assignedAt!: Date;
   public completedAt!: Date | null;
   public status!: AssignmentStatus;
+  public urgentFindings!: boolean;
 }
 
 ReportingAssignment.init(
@@ -147,6 +149,11 @@ ReportingAssignment.init(
       type: DataTypes.ENUM('assigned', 'completed', 'returned_to_pool'),
       allowNull: false,
       defaultValue: 'assigned',
+    },
+    urgentFindings: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
   },
   {

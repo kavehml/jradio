@@ -624,6 +624,7 @@ interface RadiologistWorklistRow {
   subCategories: string;
   additionalNotes: string;
   isCompleted: boolean;
+  hasUrgentFindings: boolean;
 }
 
 type ReportingAssignmentWithDetails = ReportingAssignment & {
@@ -801,6 +802,7 @@ async function loadRadiologistWorklistRows(userId: number, date: string, shift: 
       subCategories: parsedSubCategories.join(', ') || '—',
       additionalNotes: stripManagedPrefixes(item?.specialNotes) || '—',
       isCompleted: assignment.status === 'completed',
+      hasUrgentFindings: Boolean(assignment.urgentFindings),
     });
   });
 
@@ -827,6 +829,27 @@ router.patch('/assigning/reporting-status/:assignmentId', requireAuth, requireRo
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to update reporting status' });
+  }
+});
+
+router.patch('/assigning/urgent-findings/:assignmentId', requireAuth, requireRole(['admin', 'radiologist']), async (req, res) => {
+  const assignmentId = Number(req.params.assignmentId);
+  const { urgentFindings } = req.body as { urgentFindings?: boolean };
+  if (!Number.isInteger(assignmentId) || typeof urgentFindings !== 'boolean') {
+    return res.status(400).json({ error: 'assignmentId and urgentFindings(boolean) are required' });
+  }
+  try {
+    const assignment = await ReportingAssignment.findByPk(assignmentId);
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+    assignment.urgentFindings = urgentFindings;
+    await assignment.save();
+    return res.json({
+      assignmentId: assignment.id,
+      urgentFindings: assignment.urgentFindings,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update urgent findings status' });
   }
 });
 
