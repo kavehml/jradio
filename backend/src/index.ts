@@ -17,6 +17,8 @@ import './db/models/Clinic';
 import './db/models/SiteLocation';
 import './db/models/Assignments';
 import './db/models/BacklogThreshold';
+import './db/models/RvuCreditEntry';
+import './db/models/AssignmentSwapAudit';
 import authRoutes from './routes/authRoutes';
 import backlogRoutes from './routes/backlogRoutes';
 import importExportRoutes from './routes/importExportRoutes';
@@ -25,6 +27,7 @@ import requisitionsRoutes from './routes/requisitionsRoutes';
 import metaRoutes from './routes/metaRoutes';
 import shiftsRoutes from './routes/shiftsRoutes';
 import specialtyRulesRoutes from './routes/specialtyRulesRoutes';
+import rvuCreditsRoutes from './routes/rvuCreditsRoutes';
 import { ensureAdminUser } from './services/authService';
 import { seedImagingCategoriesIfEmpty } from './services/seedImagingCategories';
 
@@ -48,6 +51,7 @@ async function bootstrap() {
   app.use('/api/meta', metaRoutes);
   app.use('/api/shifts', shiftsRoutes);
   app.use('/api/specialty-rules', specialtyRulesRoutes);
+  app.use('/api/rvu-credits', rvuCreditsRoutes);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });

@@ -7,6 +7,7 @@ import { RequisitionImagingItem } from '../db/models/RequisitionImagingItem';
 import { RequisitionSpecialtyRequirement } from '../db/models/RequisitionSpecialtyRequirement';
 import { ImagingCategory } from '../db/models/ImagingCategory';
 import { ReportingAssignment } from '../db/models/Assignments';
+import { AssignmentSwapAudit } from '../db/models/AssignmentSwapAudit';
 import { ShiftAssignment, ShiftType } from '../db/models/ShiftAssignment';
 import { User } from '../db/models/User';
 import { Op } from 'sequelize';
@@ -850,6 +851,90 @@ router.patch('/assigning/urgent-findings/:assignmentId', requireAuth, requireRol
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to update urgent findings status' });
+  }
+});
+
+router.post('/assigning/swap', requireAuth, requireRole(['admin']), async (req, res) => {
+  const { fromAssignmentId, toAssignmentId, reason, allowUnequalRvu } = req.body as {
+    fromAssignmentId?: number;
+    toAssignmentId?: number;
+    reason?: string;
+    allowUnequalRvu?: boolean;
+  };
+  const fromId = Number(fromAssignmentId);
+  const toId = Number(toAssignmentId);
+  if (!Number.isInteger(fromId) || !Number.isInteger(toId) || !reason?.trim()) {
+    return res.status(400).json({
+      error: 'fromAssignmentId, toAssignmentId, and reason are required',
+    });
+  }
+  if (fromId === toId) {
+    return res.status(400).json({ error: 'Select two different assignments' });
+  }
+  const actorId = (req as unknown as { user?: { id: number } }).user?.id;
+  if (!actorId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const [fromAssignment, toAssignment] = await Promise.all([
+      ReportingAssignment.findByPk(fromId),
+      ReportingAssignment.findByPk(toId),
+    ]);
+    if (!fromAssignment || !toAssignment) {
+      return res.status(404).json({ error: 'One or both assignments were not found' });
+    }
+    const requisitionItems = await RequisitionImagingItem.findAll({
+      where: {
+        requisitionId: { [Op.in]: [fromAssignment.requisitionId, toAssignment.requisitionId] },
+      },
+      attributes: ['requisitionId', 'rvuValue'],
+    });
+    const rvuByReqId = new Map<number, number>();
+    requisitionItems.forEach((item) => rvuByReqId.set(item.requisitionId, item.rvuValue || 1));
+    const fromRvu = rvuByReqId.get(fromAssignment.requisitionId) || 1;
+    const toRvu = rvuByReqId.get(toAssignment.requisitionId) || 1;
+    if (fromRvu !== toRvu && !allowUnequalRvu) {
+      return res.status(400).json({
+        error: `RVU mismatch (${fromRvu} vs ${toRvu}). Use override to allow unequal swap.`,
+      });
+    }
+
+    const fromRadiologistId = fromAssignment.reportingRadiologistId;
+    const toRadiologistId = toAssignment.reportingRadiologistId;
+    const fromShiftId = fromAssignment.shiftId;
+    const toShiftId = toAssignment.shiftId;
+
+    fromAssignment.reportingRadiologistId = toRadiologistId;
+    fromAssignment.shiftId = toShiftId;
+    toAssignment.reportingRadiologistId = fromRadiologistId;
+    toAssignment.shiftId = fromShiftId;
+    await Promise.all([fromAssignment.save(), toAssignment.save()]);
+
+    await AssignmentSwapAudit.create({
+      fromAssignmentId: fromId,
+      toAssignmentId: toId,
+      fromRadiologistId,
+      toRadiologistId,
+      reason: reason.trim(),
+      fromRvu,
+      toRvu,
+      performedByUserId: actorId,
+    });
+
+    return res.json({
+      ok: true,
+      fromAssignmentId: fromId,
+      toAssignmentId: toId,
+      fromRvu,
+      toRvu,
+      swapped: {
+        fromNowRadiologistId: fromAssignment.reportingRadiologistId,
+        toNowRadiologistId: toAssignment.reportingRadiologistId,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to swap assignments' });
   }
 });
 

@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import { ShiftAssignment, ShiftType } from '../db/models/ShiftAssignment';
 import { User } from '../db/models/User';
 import { AuthRequest, requireAuth, requireRole } from '../middleware/authMiddleware';
+import { RvuCreditEntry } from '../db/models/RvuCreditEntry';
 
 const router = Router();
 
@@ -25,6 +26,32 @@ function resolveTargetRadiologistId(
   return req.user!.id;
 }
 
+async function loadCreditsByRadiologistDate(params: {
+  from: string;
+  to: string;
+  radiologistIds?: number[];
+}) {
+  const where: {
+    applyDate: { [Op.between]: [string, string] };
+    radiologistId?: { [Op.in]: number[] };
+  } = {
+    applyDate: { [Op.between]: [params.from, params.to] },
+  };
+  if (params.radiologistIds?.length) {
+    where.radiologistId = { [Op.in]: params.radiologistIds };
+  }
+  const credits = await RvuCreditEntry.findAll({
+    where,
+    attributes: ['radiologistId', 'applyDate', 'amount'],
+  });
+  const map = new Map<string, number>();
+  credits.forEach((c) => {
+    const k = `${c.radiologistId}_${String(c.applyDate)}`;
+    map.set(k, (map.get(k) || 0) + c.amount);
+  });
+  return map;
+}
+
 router.get('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (req: AuthRequest, res) => {
   const { from, to } = getRange(req.query as { from?: string; to?: string });
   const radiologistId = resolveTargetRadiologistId(req, (req.query as { radiologistId?: string }).radiologistId);
@@ -37,7 +64,16 @@ router.get('/mine', requireAuth, requireRole(['radiologist', 'admin']), async (r
       order: [['date', 'ASC'], ['shiftType', 'ASC']],
       attributes: ['id', 'date', 'shiftType', 'site', 'maxRvu'],
     });
-    return res.json({ shifts });
+    const creditsMap = await loadCreditsByRadiologistDate({ from, to, radiologistIds: [radiologistId] });
+    const enriched = shifts.map((s) => {
+      const creditAdjustment = creditsMap.get(`${radiologistId}_${String(s.date)}`) || 0;
+      return {
+        ...s.toJSON(),
+        creditAdjustment,
+        adjustedMaxRvu: (s.maxRvu || 0) + creditAdjustment,
+      };
+    });
+    return res.json({ shifts: enriched });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load shifts' });
@@ -127,6 +163,8 @@ router.get('/coverage', requireAuth, requireRole(['radiologist', 'admin']), asyn
       order: [['date', 'ASC'], ['shiftType', 'ASC']],
       attributes: ['id', 'date', 'shiftType', 'site', 'maxRvu', 'radiologistId'],
     });
+    const radiologistIds = Array.from(new Set(shifts.map((s) => s.radiologistId)));
+    const creditsMap = await loadCreditsByRadiologistDate({ from, to, radiologistIds });
 
     const grouped: Record<
       string,
@@ -135,7 +173,13 @@ router.get('/coverage', requireAuth, requireRole(['radiologist', 'admin']), asyn
         shiftType: ShiftType;
         radiologistCount: number;
         totalMaxRvu: number;
-        radiologists: { id: number; name: string; maxRvu: number | null }[];
+        radiologists: {
+          id: number;
+          name: string;
+          maxRvu: number | null;
+          creditAdjustment: number;
+          adjustedMaxRvu: number;
+        }[];
       }
     > = {};
 
@@ -151,12 +195,16 @@ router.get('/coverage', requireAuth, requireRole(['radiologist', 'admin']), asyn
           radiologists: [],
         };
       }
+      const creditAdjustment = creditsMap.get(`${s.radiologistId}_${date}`) || 0;
+      const adjustedMaxRvu = (s.maxRvu || 0) + creditAdjustment;
       grouped[key].radiologistCount += 1;
-      grouped[key].totalMaxRvu += s.maxRvu || 0;
+      grouped[key].totalMaxRvu += adjustedMaxRvu;
       grouped[key].radiologists.push({
         id: s.radiologistId,
         name: ((s as unknown as { radiologist?: { name?: string } }).radiologist?.name || 'Radiologist'),
         maxRvu: s.maxRvu,
+        creditAdjustment,
+        adjustedMaxRvu,
       });
     });
 

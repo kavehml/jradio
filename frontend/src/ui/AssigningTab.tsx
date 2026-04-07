@@ -12,6 +12,7 @@ import {
   RadiologistWorklistResult,
   updateAssigningUrgentFindingsStatus,
   updateAssigningReportingStatus,
+  swapAssigningCases,
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -42,6 +43,11 @@ export const AssigningTab: React.FC = () => {
   const [loadingWorklistFor, setLoadingWorklistFor] = useState<number | null>(null);
   const [savingReportFor, setSavingReportFor] = useState<number | null>(null);
   const [savingUrgentFor, setSavingUrgentFor] = useState<number | null>(null);
+  const [swapFromAssignmentId, setSwapFromAssignmentId] = useState('');
+  const [swapToAssignmentId, setSwapToAssignmentId] = useState('');
+  const [swapReason, setSwapReason] = useState('');
+  const [swapAllowUnequal, setSwapAllowUnequal] = useState(false);
+  const [swapping, setSwapping] = useState(false);
 
   const loadAssigningContext = async () => {
     if (!token) return;
@@ -244,6 +250,57 @@ export const AssigningTab: React.FC = () => {
       setError(e instanceof Error ? e.message : 'Failed to update urgent findings status');
     } finally {
       setSavingUrgentFor(null);
+    }
+  };
+
+  const handleSwapCases = async () => {
+    if (!token) return;
+    const fromAssignmentId = Number(swapFromAssignmentId);
+    const toAssignmentId = Number(swapToAssignmentId);
+    if (!Number.isInteger(fromAssignmentId) || !Number.isInteger(toAssignmentId)) {
+      setError('Enter valid assignment IDs for both cases.');
+      return;
+    }
+    if (!swapReason.trim()) {
+      setError('Please provide a swap reason.');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Swap assignment ${fromAssignmentId} with ${toAssignmentId}? This action updates radiologist ownership.`
+      )
+    ) {
+      return;
+    }
+    setSwapping(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await swapAssigningCases(token, {
+        fromAssignmentId,
+        toAssignmentId,
+        reason: swapReason.trim(),
+        allowUnequalRvu: swapAllowUnequal,
+      });
+      setMessage('Cases swapped successfully.');
+      setSwapFromAssignmentId('');
+      setSwapToAssignmentId('');
+      setSwapReason('');
+      setSwapAllowUnequal(false);
+      if (activeWorklist) {
+        const refreshed = await getAssigningRadiologistWorklist(token, {
+          date,
+          shift,
+          radiologistId: activeWorklist.radiologistId,
+        });
+        setActiveWorklist(refreshed);
+      }
+      const refreshedSummary = await getAssigningSummary(token, date, shift);
+      setSummary(refreshedSummary);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to swap cases');
+    } finally {
+      setSwapping(false);
     }
   };
 
@@ -500,6 +557,56 @@ export const AssigningTab: React.FC = () => {
                 )}
               </tbody>
             </table>
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              borderTop: '1px solid #e2e8f0',
+              paddingTop: 10,
+              display: 'grid',
+              gap: 8,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            }}
+          >
+            <label>
+              Swap from assignment ID
+              <input
+                type="number"
+                value={swapFromAssignmentId}
+                onChange={(e) => setSwapFromAssignmentId(e.target.value)}
+                placeholder="e.g. 101"
+              />
+            </label>
+            <label>
+              Swap to assignment ID
+              <input
+                type="number"
+                value={swapToAssignmentId}
+                onChange={(e) => setSwapToAssignmentId(e.target.value)}
+                placeholder="e.g. 118"
+              />
+            </label>
+            <label style={{ gridColumn: '1 / -1' }}>
+              Swap reason
+              <input
+                value={swapReason}
+                onChange={(e) => setSwapReason(e.target.value)}
+                placeholder="Distribution correction / personal relationship / other"
+              />
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={swapAllowUnequal}
+                onChange={(e) => setSwapAllowUnequal(e.target.checked)}
+              />
+              Allow unequal RVU swap override
+            </label>
+            <div>
+              <button type="button" disabled={swapping} onClick={() => void handleSwapCases()}>
+                {swapping ? 'Swapping…' : 'Swap cases'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -22,6 +22,7 @@ function navForRole(
         { to: '/radiologist/calendar', labelKey: 'radCalendar' },
         { to: '/service-rules', labelKey: 'serviceRules' },
         { to: '/admin/radiologist-schedule', labelKey: 'radSchedule' },
+        { to: '/admin/rvu-credits', labelKey: 'rvuCredits' },
         { to: '/admin', labelKey: 'userAccess' },
       ],
     };

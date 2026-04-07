@@ -13,6 +13,7 @@ import { RequisitionsAdmin } from './ui/RequisitionsAdmin';
 import { SpecialtyRulesAdmin } from './ui/SpecialtyRulesAdmin';
 import { AssigningTab } from './ui/AssigningTab';
 import { UserSettingsPage } from './ui/UserSettingsPage';
+import { AdminRvuCredits } from './ui/AdminRvuCredits';
 import {
   PhysicianNewRequisition,
   PhysicianHistory,
@@ -93,6 +94,14 @@ const Root = () => (
               element={
                 <RoleRoute roles={['admin']}>
                   <RadiologistDashboard initialViewMode="week" />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="admin/rvu-credits"
+              element={
+                <RoleRoute roles={['admin']}>
+                  <AdminRvuCredits />
                 </RoleRoute>
               }
             />

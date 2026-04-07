@@ -621,6 +621,30 @@ export async function updateAssigningUrgentFindingsStatus(
   return res.json() as Promise<{ assignmentId: number; urgentFindings: boolean }>;
 }
 
+export async function swapAssigningCases(
+  token: string,
+  data: {
+    fromAssignmentId: number;
+    toAssignmentId: number;
+    reason: string;
+    allowUnequalRvu?: boolean;
+  }
+) {
+  const res = await fetch(`${getApiBase()}/api/requisitions/assigning/swap`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to swap assignments');
+  }
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
 export async function updateRequisitionSchedule(
   token: string,
   id: number,
@@ -705,6 +729,8 @@ export interface ShiftDto {
   shiftType: 'AM' | 'PM' | 'NIGHT';
   site: string;
   maxRvu: number | null;
+  creditAdjustment?: number;
+  adjustedMaxRvu?: number;
 }
 
 export interface ShiftCoverageDto {
@@ -712,7 +738,62 @@ export interface ShiftCoverageDto {
   shiftType: 'AM' | 'PM' | 'NIGHT';
   radiologistCount: number;
   totalMaxRvu: number;
-  radiologists: { id: number; name: string; maxRvu: number | null }[];
+  radiologists: {
+    id: number;
+    name: string;
+    maxRvu: number | null;
+    creditAdjustment?: number;
+    adjustedMaxRvu?: number;
+  }[];
+}
+
+export interface RvuCreditEntryDto {
+  id: number;
+  radiologistId: number;
+  creditType: 'earned' | 'given';
+  amount: number;
+  applyDate: string;
+  note: string | null;
+  createdByUserId: number;
+  radiologist?: { id: number; name: string };
+}
+
+export async function getRvuCredits(token: string, from?: string, to?: string) {
+  const query = new URLSearchParams({
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+  });
+  const url = `${getApiBase()}/api/rvu-credits${query.toString() ? `?${query.toString()}` : ''}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load RVU credits');
+  return (await res.json()) as { entries: RvuCreditEntryDto[] };
+}
+
+export async function createRvuCredit(
+  token: string,
+  data: {
+    radiologistId: number;
+    creditType: 'earned' | 'given';
+    amount: number;
+    applyDate: string;
+    note?: string;
+  }
+) {
+  const res = await fetch(`${getApiBase()}/api/rvu-credits`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to create RVU credit');
+  }
+  return res.json() as Promise<RvuCreditEntryDto>;
 }
 
 export async function getMyShifts(
