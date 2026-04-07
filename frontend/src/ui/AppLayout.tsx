@@ -14,6 +14,12 @@ function navForRole(
     return {
       subtitleRole: t.roles.admin,
       items: [
+        { to: '/clerical', labelKey: 'clericalIntake' },
+        { to: '/requisitions', labelKey: 'requisitions' },
+        { to: '/assigning', labelKey: 'workloadSeparation' },
+        { to: '/radiologist/requisitions', labelKey: 'radRequisitions' },
+        { to: '/radiologist/weekly', labelKey: 'radWeekly' },
+        { to: '/radiologist/calendar', labelKey: 'radCalendar' },
         { to: '/service-rules', labelKey: 'serviceRules' },
         { to: '/admin/radiologist-schedule', labelKey: 'radSchedule' },
         { to: '/admin', labelKey: 'userAccess' },
