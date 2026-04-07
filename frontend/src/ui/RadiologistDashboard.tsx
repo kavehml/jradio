@@ -59,10 +59,16 @@ function buildCalendarGrid(anchor: Date) {
   return days;
 }
 
-export const RadiologistDashboard: React.FC = () => {
+export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
+  initialViewMode = 'month',
+}) => {
   const { token, user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
+
+  useEffect(() => {
+    setViewMode(initialViewMode);
+  }, [initialViewMode]);
   const [viewAnchor, setViewAnchor] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<string>(() => toIsoDate(new Date()));
   const [defaultSite, setDefaultSite] = useState('General');

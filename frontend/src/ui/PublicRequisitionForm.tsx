@@ -17,7 +17,7 @@ interface Category {
   imagePath: string | null;
 }
 
-export const PublicRequisitionForm: React.FC = () => {
+export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -470,11 +470,23 @@ export const PublicRequisitionForm: React.FC = () => {
   };
 
   return (
-    <section style={{ maxWidth: 960, margin: '0 auto', padding: '1.5rem 1rem' }}>
-      <h2>External requisition form</h2>
-      <p style={{ color: '#4b5563', marginBottom: '1rem', maxWidth: 720 }}>
-        This form is for clinics outside the radiology department to request imaging. Please complete all required fields as accurately as possible.
-      </p>
+    <section
+      className={embedded ? 'v3-public-form v3-public-form--embedded' : 'v3-public-form'}
+      style={
+        embedded
+          ? undefined
+          : { maxWidth: 960, margin: '0 auto', padding: '1.5rem 1rem' }
+      }
+    >
+      {!embedded && (
+        <>
+          <h2 className="v3-page-title">External requisition form</h2>
+          <p className="v3-page-lead" style={{ maxWidth: 720 }}>
+            This form is for clinics outside the radiology department to request imaging. Please complete
+            all required fields as accurately as possible.
+          </p>
+        </>
+      )}
 
       {loading ? (
         <p>Loading categories…</p>
@@ -645,16 +657,21 @@ export const PublicRequisitionForm: React.FC = () => {
       )}
 
       <form
+        className={embedded ? 'v3-card v3-card__body v3-public-form-inner' : undefined}
         onSubmit={handleSubmit}
-        style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: 8,
-          boxShadow: '0 1px 3px rgba(15,23,42,0.1)',
-          display: 'grid',
-          gap: '0.75rem',
-          marginTop: '1rem',
-        }}
+        style={
+          embedded
+            ? { display: 'grid', gap: '0.75rem' }
+            : {
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: 8,
+                boxShadow: '0 1px 3px rgba(15,23,42,0.1)',
+                display: 'grid',
+                gap: '0.75rem',
+                marginTop: '1rem',
+              }
+        }
       >
         {message && (
           <div

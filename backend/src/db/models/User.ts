@@ -1,7 +1,7 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../index';
 
-export type UserRole = 'radiologist' | 'clerical' | 'admin';
+export type UserRole = 'radiologist' | 'clerical' | 'admin' | 'physician' | 'technologist';
 
 interface UserAttributes {
   id: number;
@@ -44,7 +44,13 @@ User.init(
       allowNull: false,
     },
     role: {
-      type: DataTypes.ENUM('radiologist', 'clerical', 'admin'),
+      type: DataTypes.ENUM(
+        'radiologist',
+        'clerical',
+        'admin',
+        'physician',
+        'technologist'
+      ),
       allowNull: false,
     },
     active: {

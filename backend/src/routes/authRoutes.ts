@@ -126,9 +126,27 @@ router.put('/users/:id/radiologist-profile', requireAuth, requireRole(['admin'])
   }
 });
 
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   const typedReq = req as AuthRequest;
-  return res.json({ user: typedReq.user });
+  try {
+    const user = await User.findByPk(typedReq.user!.id, {
+      attributes: ['id', 'name', 'email', 'role'],
+    });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    return res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load profile' });
+  }
 });
 
 export default router;

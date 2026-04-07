@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { getMe, login as apiLogin } from '../api';
 
-type Role = 'admin' | 'radiologist' | 'clerical';
+type Role = 'admin' | 'radiologist' | 'clerical' | 'physician' | 'technologist';
 
 interface User {
   id: number;
@@ -37,7 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = useCallback(async (token: string) => {
     try {
       const { user } = await getMe(token);
-      const u: User = { id: user.id, name: user.name, role: user.role as Role };
+      const u: User = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role as Role,
+      };
       setState({ token, user: u, loading: false });
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(USER_KEY, JSON.stringify(u));
@@ -54,17 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState((s) => ({ ...s, loading: false }));
       return;
     }
-    const stored = localStorage.getItem(USER_KEY);
-    if (stored) {
-      try {
-        const user = JSON.parse(stored) as User;
-        setState((s) => ({ ...s, user, loading: false }));
-      } catch {
-        loadUser(token);
-      }
-    } else {
-      loadUser(token);
-    }
+    void loadUser(token);
   }, [state.token, loadUser]);
 
   const login = useCallback(

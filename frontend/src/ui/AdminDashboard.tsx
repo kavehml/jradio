@@ -21,7 +21,9 @@ export const AdminDashboard: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'radiologist' | 'clerical'>('radiologist');
+  const [role, setRole] = useState<
+    'admin' | 'radiologist' | 'clerical' | 'physician' | 'technologist'
+  >('radiologist');
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [users, setUsers] = useState<UserDto[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -259,9 +261,23 @@ export const AdminDashboard: React.FC = () => {
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span>Role</span>
-              <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'radiologist' | 'clerical')}>
+              <select
+                value={role}
+                onChange={(e) =>
+                  setRole(
+                    e.target.value as
+                      | 'admin'
+                      | 'radiologist'
+                      | 'clerical'
+                      | 'physician'
+                      | 'technologist'
+                  )
+                }
+              >
                 <option value="radiologist">Radiologist</option>
                 <option value="clerical">Clerical</option>
+                <option value="physician">Physician</option>
+                <option value="technologist">Technologist</option>
                 <option value="admin">Admin</option>
               </select>
             </label>

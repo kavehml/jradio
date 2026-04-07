@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 export function LoginPage() {
@@ -17,8 +17,10 @@ export function LoginPage() {
     try {
       const user = await login(email, password);
       if (user.role === 'admin') navigate('/admin', { replace: true });
-      else if (user.role === 'radiologist') navigate('/radiologist', { replace: true });
+      else if (user.role === 'radiologist') navigate('/radiologist/requisitions', { replace: true });
       else if (user.role === 'clerical') navigate('/clerical', { replace: true });
+      else if (user.role === 'physician') navigate('/physician/new', { replace: true });
+      else if (user.role === 'technologist') navigate('/technologist', { replace: true });
       else navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -28,33 +30,16 @@ export function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f1f5f9',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: 'white',
-          padding: '2rem',
-          borderRadius: 12,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-          width: '100%',
-          maxWidth: 360,
-        }}
-      >
-        <h1 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.5rem' }}>
-          Radiology RVU Workload App
-        </h1>
-        <p style={{ color: '#64748b', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-          Sign in with your email and password.
-        </p>
+    <div className="v3-login-bg">
+      <div className="v3-login-brand">
+        <div className="v3-login-logo" aria-hidden />
+        <div className="v3-login-brand-name">Radiology workload</div>
+      </div>
+
+      <form className="v3-login-card" onSubmit={handleSubmit}>
+        <h1 className="v3-login-app-title">Radiology RVU workload app</h1>
+        <p className="v3-login-sub">Sign in with your work email and password.</p>
+
         {error && (
           <div
             style={{
@@ -69,57 +54,49 @@ export function LoginPage() {
             {error}
           </div>
         )}
-        <label style={{ display: 'block', marginBottom: '1rem' }}>
-          <span style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Email</span>
+
+        <label className="v3-field">
+          <span>E-mail</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            style={{
-              width: '100%',
-              padding: '0.5rem 0.75rem',
-              border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              boxSizing: 'border-box',
-            }}
+            placeholder="you@hospital.org"
           />
         </label>
-        <label style={{ display: 'block', marginBottom: '1.5rem' }}>
-          <span style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Password</span>
+        <label className="v3-field">
+          <span>Password</span>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            style={{
-              width: '100%',
-              padding: '0.5rem 0.75rem',
-              border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              boxSizing: 'border-box',
-            }}
+            placeholder="••••••••"
           />
         </label>
-        <button
-          type="submit"
-          disabled={submitting}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            background: submitting ? '#94a3b8' : 'rgb(200,103,51)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 8,
-            fontWeight: 600,
-            cursor: submitting ? 'not-allowed' : 'pointer',
-          }}
-        >
+
+        <button type="submit" disabled={submitting} className="v3-login-submit">
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <a className="v3-login-forgot" href="#" onClick={(e) => e.preventDefault()}>
+          Forgot password?
+        </a>
       </form>
+
+      <p className="v3-login-footer">
+        Don’t have an account?{' '}
+        <Link to="/signup" className="v3-link">
+          Request access
+        </Link>
+        {' · '}
+        <Link to="/external-requisition" className="v3-link">
+          Public requisition
+        </Link>
+      </p>
     </div>
   );
 }

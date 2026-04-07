@@ -90,8 +90,15 @@ function modalityForUi(item?: {
   return item.modality;
 }
 
-export const RequisitionsAdmin: React.FC = () => {
+export type RequisitionsAdminVariant = 'full' | 'radiologist' | 'technologist';
+
+export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }> = ({
+  variant = 'full',
+}) => {
   const { token } = useAuth();
+  const canImport = variant === 'full';
+  const canDelete = variant === 'full';
+  const canEdit = variant !== 'technologist';
   const [rows, setRows] = useState<RequisitionSummary[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subCategoryMap, setSubCategoryMap] = useState<Record<number, string[]>>({});
@@ -817,9 +824,19 @@ export const RequisitionsAdmin: React.FC = () => {
     setSubCategoryDraft((prev) => ({ ...prev, [rowId]: '' }));
   };
 
+  const pageTitle =
+    variant === 'full'
+      ? 'All requisitions'
+      : variant === 'radiologist'
+        ? 'Requisition search'
+        : 'Requisition list';
+
   return (
-    <section style={{ maxWidth: 1120, margin: '0 auto' }}>
-      <h3 style={{ marginTop: 0 }}>All requisitions</h3>
+    <section className="v3-page" style={{ maxWidth: 1120, margin: '0 auto' }}>
+      <h1 className="v3-page-title" style={{ fontSize: '1.35rem' }}>
+        {pageTitle}
+      </h1>
+      {canImport && (
       <div
         style={{
           marginBottom: '0.9rem',
@@ -869,6 +886,7 @@ export const RequisitionsAdmin: React.FC = () => {
           </pre>
         )}
       </div>
+      )}
       {loading && <p>Loading requisitions…</p>}
       {error && <p style={{ color: '#b91c1c' }}>{error}</p>}
       {!loading && !error && (
@@ -912,6 +930,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     {r.status === 'pending_approval' ? (
                       <select
+                        disabled={!canEdit}
                         value={getRowImaging(r).modality ?? ''}
                         onChange={(e) =>
                           setLocalImaging((prev) => ({
@@ -944,6 +963,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     {r.status === 'pending_approval' ? (
                       <select
+                        disabled={!canEdit}
                         value={getRowImaging(r).categoryId ?? ''}
                         onChange={(e) =>
                           setLocalImaging((prev) => ({
@@ -993,6 +1013,7 @@ export const RequisitionsAdmin: React.FC = () => {
                               >
                                 <input
                                   type="checkbox"
+                                  disabled={!canEdit}
                                   checked={getRowImaging(r).selectedSubCategories.includes(s)}
                                   onChange={() => toggleSubCategory(r.id, s)}
                                 />
@@ -1004,6 +1025,7 @@ export const RequisitionsAdmin: React.FC = () => {
                         <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                           <input
                             type="text"
+                            disabled={!canEdit}
                             placeholder="Add custom subcategory"
                             value={subCategoryDraft[r.id] || ''}
                             onChange={(e) =>
@@ -1017,7 +1039,7 @@ export const RequisitionsAdmin: React.FC = () => {
                             }}
                             style={{ flex: 1, minWidth: 0 }}
                           />
-                          <button type="button" onClick={() => addCustomSubCategory(r.id)}>
+                          <button type="button" disabled={!canEdit} onClick={() => addCustomSubCategory(r.id)}>
                             Add
                           </button>
                         </div>
@@ -1031,6 +1053,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     <textarea
+                      readOnly={!canEdit}
                       value={localNotes[r.id] ?? r.imagingItems?.[0]?.specialNotes ?? ''}
                       onChange={(e) =>
                         setLocalNotes((prev) => ({ ...prev, [r.id]: e.target.value }))
@@ -1042,6 +1065,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     <input
                       type="number"
+                      disabled={!canEdit}
                       min={1}
                       max={3}
                       defaultValue={r.imagingItems?.[0]?.rvuValue ?? 1}
@@ -1060,6 +1084,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     <input
                       type="date"
+                      disabled={!canEdit}
                       value={localRows[r.id]?.dueDate ?? ''}
                       onChange={(e) =>
                         setLocalRows((prev) => ({
@@ -1071,6 +1096,7 @@ export const RequisitionsAdmin: React.FC = () => {
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                     <select
+                      disabled={!canEdit}
                       value={localRows[r.id]?.shift ?? 'NA'}
                       onChange={(e) =>
                         setLocalRows((prev) => ({
@@ -1086,16 +1112,18 @@ export const RequisitionsAdmin: React.FC = () => {
                     </select>
                   </td>
                   <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        type="button"
-                        disabled={savingId === r.id}
-                        onClick={() => void handleUpdateSchedule(r.id)}
-                        style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
-                      >
-                        {savingId === r.id ? 'Saving…' : 'Save schedule'}
-                      </button>
-                      {r.status === 'pending_approval' && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          disabled={savingId === r.id}
+                          onClick={() => void handleUpdateSchedule(r.id)}
+                          style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
+                        >
+                          {savingId === r.id ? 'Saving…' : 'Save schedule'}
+                        </button>
+                      )}
+                      {canEdit && r.status === 'pending_approval' && (
                         <button
                           type="button"
                           disabled={savingId === r.id}
@@ -1105,17 +1133,20 @@ export const RequisitionsAdmin: React.FC = () => {
                           {savingId === r.id ? 'Saving…' : 'Save imaging'}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        disabled={savingId === r.id}
-                        onClick={() => void handleUpdateNotes(r.id)}
-                        style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
-                      >
-                        {savingId === r.id ? 'Saving…' : 'Save notes'}
-                      </button>
-                      {r.status === 'pending_approval' && (
+                      {canEdit && (
                         <button
                           type="button"
+                          disabled={savingId === r.id}
+                          onClick={() => void handleUpdateNotes(r.id)}
+                          style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
+                        >
+                          {savingId === r.id ? 'Saving…' : 'Save notes'}
+                        </button>
+                      )}
+                      {canEdit && r.status === 'pending_approval' && (
+                        <button
+                          type="button"
+                          className="v3-btn--success"
                           disabled={savingId === r.id}
                           onClick={() => void handleApprove(r.id)}
                           style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
@@ -1123,14 +1154,16 @@ export const RequisitionsAdmin: React.FC = () => {
                           {savingId === r.id ? 'Saving…' : 'Approve'}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        disabled={savingId === r.id}
-                        onClick={() => void handleDelete(r.id)}
-                        style={{ padding: '0.25rem 0.75rem', cursor: 'pointer', color: '#b91c1c' }}
-                      >
-                        {savingId === r.id ? 'Saving…' : 'Delete'}
-                      </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          disabled={savingId === r.id}
+                          onClick={() => void handleDelete(r.id)}
+                          style={{ padding: '0.25rem 0.75rem', cursor: 'pointer', color: '#b91c1c' }}
+                        >
+                          {savingId === r.id ? 'Saving…' : 'Delete'}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

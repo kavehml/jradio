@@ -502,43 +502,130 @@ export const ClericalIntake: React.FC = () => {
   };
 
   return (
-    <section style={{ maxWidth: 960, margin: '0 auto' }}>
-      <h2>Clerical requisition intake</h2>
-      <p style={{ color: '#4b5563', marginBottom: '1rem' }}>
-        Choose modality, then category and exam type. Due date is set automatically from time delay or prior imaging.
+    <div className="v3-page v3-page--wide">
+      <h1 className="v3-page-title">Clerical intake</h1>
+      <p className="v3-page-lead">
+        Choose modality, then imaging category and exam types. Due date is derived from time delay and prior
+        imaging when applicable.
       </p>
 
-      {loading ? (
-        <p>Loading categories…</p>
-      ) : (
-        <>
-          <h3 style={{ marginBottom: '0.5rem' }}>Modality *</h3>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            {['X-ray', 'CT', 'MRI', 'US', 'PET'].map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => {
-                  setModality(m);
-                  setSelectedCategory(null);
-                  setSubCategories([]);
-                  setMriSequences([]);
-                }}
-                style={{
-                  padding: '0.35rem 0.9rem',
-                  borderRadius: 999,
-                  border: modality === m ? '2px solid #c86733' : '1px solid #e2e8f0',
-                  background: modality === m ? 'linear-gradient(135deg, #f8dfd0 0%, #fdeee6 100%)' : '#fffaf7',
-                  color: modality === m ? '#9a4a20' : '#334155',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                }}
-              >
-                {m}
-              </button>
-            ))}
+      <form onSubmit={handleSubmit} className="v3-intake-formwrap">
+        <div className="v3-intake-grid">
+          <div className="v3-card v3-intake-card">
+            <div className="v3-card__header">Patient requisition information</div>
+            <div className="v3-card__body" style={{ display: 'grid', gap: '0.85rem' }}>
+              {message && (
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    background: message.type === 'ok' ? '#f0fdf4' : '#fef2f2',
+                    color: message.type === 'ok' ? '#166534' : '#b91c1c',
+                    borderRadius: 8,
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  {message.text}
+                </div>
+              )}
+              <label className="v3-field">
+                <span className="v3-field__label">Patient name *</span>
+                <p className="v3-field-hint">Enter the patient&apos;s first and last names.</p>
+                <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} required />
+              </label>
+              <label className="v3-field">
+                <span className="v3-field__label">Patient identifier *</span>
+                <p className="v3-field-hint">MRN, patient ID, or temporary label.</p>
+                <input type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
+              </label>
+              <label className="v3-field">
+                <span className="v3-field__label">Patient DOB *</span>
+                <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} required />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={isNewExternal} onChange={(e) => setIsNewExternal(e.target.checked)} />
+                <span>New external patient</span>
+              </label>
+              <label className="v3-field">
+                <span className="v3-field__label">Ordering physician</span>
+                <p className="v3-field-hint">Name of the requesting physician.</p>
+                <input type="text" value={orderingDoctor} onChange={(e) => setOrderingDoctor(e.target.value)} />
+              </label>
+              <label className="v3-field">
+                <span className="v3-field__label">Requesting clinic</span>
+                <p className="v3-field-hint">Select a saved clinic or type a name.</p>
+                <select
+                  value={orderingClinic}
+                  onChange={(e) => setOrderingClinic(e.target.value)}
+                  style={{ marginBottom: 4 }}
+                >
+                  <option value="">Select saved clinic (optional)</option>
+                  {clinicOptions.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={orderingClinic}
+                  onChange={(e) => setOrderingClinic(e.target.value)}
+                  placeholder="Or type clinic name…"
+                />
+              </label>
+              <label className="v3-field">
+                <span className="v3-field__label">Site / reporting location</span>
+                <p className="v3-field-hint">Preferred site or reporting location.</p>
+                <select value={site} onChange={(e) => setSite(e.target.value)} style={{ marginBottom: 4 }}>
+                  <option value="">Select saved site (optional)</option>
+                  {siteOptions.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={site}
+                  onChange={(e) => setSite(e.target.value)}
+                  placeholder="Or type site/location…"
+                />
+              </label>
+              <label className="v3-field">
+                <span className="v3-field__label">Date of request</span>
+                <p className="v3-field-hint">Date the request form is completed.</p>
+                <input type="date" value={dateOfRequest} onChange={(e) => setDateOfRequest(e.target.value)} />
+              </label>
+            </div>
           </div>
+
+          <div className="v3-card v3-intake-card">
+            <div className="v3-card__header">Exam requisition information</div>
+            <div className="v3-card__body" style={{ display: 'grid', gap: '0.85rem' }}>
+              {loading ? (
+                <p style={{ color: 'var(--v3-muted)' }}>Loading categories…</p>
+              ) : (
+                <>
+                  <div className="v3-field">
+                    <span className="v3-field__label">Modality *</span>
+                    <p className="v3-field-hint">Choose the imaging modality.</p>
+                    <div className="v3-pill-group">
+                      {['X-ray', 'CT', 'MRI', 'US', 'PET'].map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          className={`v3-pill${modality === m ? ' v3-pill--on' : ''}`}
+                          onClick={() => {
+                            setModality(m);
+                            setSelectedCategory(null);
+                            setSubCategories([]);
+                            setMriSequences([]);
+                          }}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
           {modality && (
             <>
               <h3 style={{ marginBottom: '0.5rem' }}>Imaging category</h3>
@@ -673,118 +760,42 @@ export const ClericalIntake: React.FC = () => {
               )}
             </>
           )}
-        </>
-      )}
-
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: 8,
-          boxShadow: '0 1px 3px rgba(15,23,42,0.1)',
-          display: 'grid',
-          gap: '0.75rem',
-        }}
-      >
-        {message && (
-          <div
-            style={{
-              padding: '0.75rem',
-              background: message.type === 'ok' ? '#f0fdf4' : '#fef2f2',
-              color: message.type === 'ok' ? '#166534' : '#b91c1c',
-              borderRadius: 8,
-              fontSize: '0.9rem',
-            }}
-          >
-            {message.text}
+                  <label className="v3-field">
+                    <span className="v3-field__label">Time delay allowed</span>
+                    <p className="v3-field-hint">Supports automatic due-date rules where configured.</p>
+                    <select value={timeDelayPreset} onChange={(e) => setTimeDelayPreset(e.target.value)}>
+                      <option value="">Not specified</option>
+                      {timeDelayOptions.map((opt) => (
+                        <option key={opt.code} value={opt.code}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={hasImagingWithin24h}
+                      onChange={(e) => setHasImagingWithin24h(e.target.checked)}
+                    />
+                    <span>Patient has relevant imaging within last 24 hours</span>
+                  </label>
+                  <label className="v3-field">
+                    <span className="v3-field__label">Clinical notes</span>
+                    <p className="v3-field-hint">History or context for the reading team.</p>
+                    <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
+                  </label>
+                  <div className="v3-btn-row">
+                    <button type="submit" disabled={submitting} className="v3-btn--primary">
+                      {submitting ? 'Submitting…' : 'Submit exam requisition'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        )}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>MRN / Patient ID or temp label *</span>
-          <input type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient name *</span>
-          <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} required />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient DOB *</span>
-          <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} required />
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="checkbox" checked={isNewExternal} onChange={(e) => setIsNewExternal(e.target.checked)} />
-          <span>New external patient</span>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Ordering doctor</span>
-          <input type="text" value={orderingDoctor} onChange={(e) => setOrderingDoctor(e.target.value)} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Clinic</span>
-          <select
-            value={orderingClinic}
-            onChange={(e) => setOrderingClinic(e.target.value)}
-            style={{ marginBottom: 4 }}
-          >
-            <option value="">Select saved clinic (optional)</option>
-            {clinicOptions.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            value={orderingClinic}
-            onChange={(e) => setOrderingClinic(e.target.value)}
-            placeholder="Or type clinic name…"
-          />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Site / location</span>
-          <select value={site} onChange={(e) => setSite(e.target.value)} style={{ marginBottom: 4 }}>
-            <option value="">Select saved site (optional)</option>
-            {siteOptions.map((s) => (
-              <option key={s.id} value={s.name}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            value={site}
-            onChange={(e) => setSite(e.target.value)}
-            placeholder="Or type site/location…"
-          />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Date of request</span>
-          <input type="date" value={dateOfRequest} onChange={(e) => setDateOfRequest(e.target.value)} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Time delay allowed</span>
-          <select value={timeDelayPreset} onChange={(e) => setTimeDelayPreset(e.target.value)}>
-            <option value="">Not specified</option>
-            {timeDelayOptions.map((opt) => (
-              <option key={opt.code} value={opt.code}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="checkbox" checked={hasImagingWithin24h} onChange={(e) => setHasImagingWithin24h(e.target.checked)} />
-          <span>Patient has relevant imaging within last 24 hours</span>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Additional notes</span>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-        </label>
-        <button type="submit" disabled={submitting} style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', cursor: submitting ? 'not-allowed' : 'pointer' }}>
-          {submitting ? 'Saving…' : 'Save requisition'}
-        </button>
+        </div>
       </form>
-    </section>
+    </div>
   );
 };

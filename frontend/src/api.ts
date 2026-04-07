@@ -22,7 +22,7 @@ export async function getMe(token: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Not authenticated');
-  return res.json() as Promise<{ user: { id: number; role: string; name: string } }>;
+  return res.json() as Promise<{ user: { id: number; role: string; name: string; email: string } }>;
 }
 
 export async function createUser(

@@ -1,11 +1,77 @@
 import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useAppUi } from '../context/AppUiContext';
+import { navT, type UiRole } from '../i18n/nav';
+
+type NavItem = { to: string; labelKey: string };
+
+function navForRole(
+  role: string | undefined,
+  t: ReturnType<typeof navT>
+): { subtitleRole: string; items: NavItem[] } {
+  if (role === 'admin') {
+    return {
+      subtitleRole: t.roles.admin,
+      items: [
+        { to: '/service-rules', labelKey: 'serviceRules' },
+        { to: '/admin/radiologist-schedule', labelKey: 'radSchedule' },
+        { to: '/admin', labelKey: 'userAccess' },
+      ],
+    };
+  }
+  if (role === 'clerical') {
+    return {
+      subtitleRole: t.roles.clerical,
+      items: [
+        { to: '/clerical', labelKey: 'clericalIntake' },
+        { to: '/requisitions', labelKey: 'requisitions' },
+        { to: '/assigning', labelKey: 'workloadSeparation' },
+      ],
+    };
+  }
+  if (role === 'radiologist') {
+    return {
+      subtitleRole: t.roles.radiologist,
+      items: [
+        { to: '/radiologist/requisitions', labelKey: 'radRequisitions' },
+        { to: '/radiologist/weekly', labelKey: 'radWeekly' },
+        { to: '/radiologist/calendar', labelKey: 'radCalendar' },
+      ],
+    };
+  }
+  if (role === 'physician') {
+    return {
+      subtitleRole: t.roles.physician,
+      items: [
+        { to: '/physician/new', labelKey: 'physNew' },
+        { to: '/physician/history', labelKey: 'physHistory' },
+        { to: '/physician/flagged', labelKey: 'physFlagged' },
+      ],
+    };
+  }
+  if (role === 'technologist') {
+    return {
+      subtitleRole: t.roles.technologist,
+      items: [{ to: '/technologist', labelKey: 'techList' }],
+    };
+  }
+  return { subtitleRole: '', items: [] };
+}
+
+function initials(name: string) {
+  const p = name.trim().split(/\s+/);
+  if (!p.length) return '?';
+  if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
+  return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+}
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { lang, setLang } = useAppUi();
+  const t = navT(lang);
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   const handleLogout = () => {
@@ -13,99 +79,97 @@ export const AppLayout: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
-  const role = user?.role;
-  const canSeeAdmin = role === 'admin';
-  const canSeeClerical = role === 'admin' || role === 'clerical';
-  const canSeeRequisitions = role === 'admin' || role === 'clerical';
-  const canSeeAssigning = role === 'admin';
-  const canSeeServiceRules = role === 'admin';
-  const canSeeRadiologist = true;
+  const role = user?.role as UiRole | undefined;
+  const { subtitleRole, items } = navForRole(user?.role, t);
 
-  const navLinks = [
-    canSeeRadiologist ? { to: '/radiologist', label: 'Radiologist calendar', key: 'radiologist' } : null,
-    canSeeClerical ? { to: '/clerical', label: 'Clerical intake', key: 'clerical' } : null,
-    canSeeRequisitions ? { to: '/requisitions', label: 'Requisitions', key: 'requisitions' } : null,
-    canSeeAssigning ? { to: '/assigning', label: 'Assigning', key: 'assigning' } : null,
-    canSeeServiceRules ? { to: '/service-rules', label: 'Service rules', key: 'service-rules' } : null,
-    canSeeAdmin ? { to: '/admin', label: 'Setting', key: 'admin' } : null,
-  ].filter((x): x is { to: string; label: string; key: string } => Boolean(x));
+  const path = location.pathname;
+  const isActive = (item: NavItem) => {
+    if (item.to === '/admin') return path === '/admin';
+    if (path === item.to) return true;
+    return path.startsWith(`${item.to}/`);
+  };
+
+  const settingsActive = path.startsWith('/settings');
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex' }}>
-      <aside
-        style={{
-          width: 260,
-          background: '#fff',
-          borderRight: '1px solid #e2e8f0',
-          padding: '1rem',
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-        }}
-        className={`app-sidebar${mobileOpen ? ' open' : ''}`}
-      >
-        <h1 style={{ margin: '0 0 1rem', fontSize: '1.05rem' }}>Radiology RVU</h1>
-        <div style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1rem' }}>
-          {user?.name}
+    <div className="v3-shell">
+      <aside className={`v3-sidebar${mobileOpen ? ' v3-sidebar--open' : ''}`}>
+        <div className="v3-sidebar__head">
+          <h1 className="v3-sidebar__menu-title">{t.menu}</h1>
+          <p className="v3-sidebar__role">{subtitleRole}</p>
         </div>
-        <nav style={{ display: 'grid', gap: 6 }}>
-          {navLinks.map((item) => {
-            const active = location.pathname.includes(item.key);
+        <nav className="v3-sidebar__nav">
+          {items.map((item) => {
+            const active = isActive(item);
+            const label = t.nav[item.labelKey as keyof typeof t.nav] ?? item.labelKey;
             return (
               <Link
                 key={item.to}
                 to={item.to}
+                className={`v3-sidebar__link${active ? ' v3-sidebar__link--active' : ''}`}
                 onClick={() => setMobileOpen(false)}
-                style={{
-                  textDecoration: 'none',
-                  padding: '0.62rem 0.72rem',
-                  borderRadius: 10,
-                  background: active ? 'rgba(200,103,51,0.16)' : 'transparent',
-                  color: active ? '#9a4a20' : '#334155',
-                  fontWeight: active ? 600 : 500,
-                }}
               >
-                {item.label}
+                {label}
               </Link>
             );
           })}
-        </nav>
-        <button
-          type="button"
-          onClick={handleLogout}
-          style={{ marginTop: '1rem', width: '100%', background: '#111827' }}
-        >
-          Logout
-        </button>
-      </aside>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <header
-          style={{
-            padding: '0.9rem 1rem',
-            borderBottom: '1px solid #e2e8f0',
-            background: 'rgba(255,255,255,0.9)',
-            backdropFilter: 'blur(5px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            position: 'sticky',
-            top: 0,
-            zIndex: 2,
-          }}
-        >
-          <strong style={{ fontSize: '1rem' }}>Radiology RVU Workload App</strong>
-          <button
-            type="button"
-            onClick={() => setMobileOpen((v) => !v)}
-            className="app-mobile-menu-btn"
-            style={{ display: 'none' }}
+          <Link
+            to="/settings"
+            className={`v3-sidebar__link${settingsActive ? ' v3-sidebar__link--active' : ''}`}
+            onClick={() => setMobileOpen(false)}
+            style={{ marginTop: 8 }}
           >
-            Menu
+            ⚙ {t.settings}
+          </Link>
+        </nav>
+        <div className="v3-sidebar__foot">
+          <button type="button" className="v3-sidebar__logout" onClick={handleLogout}>
+            {t.logout}
           </button>
+        </div>
+      </aside>
+
+      <div className="v3-main">
+        <header className="v3-topbar">
+          <div className="v3-topbar__left">
+            <button
+              type="button"
+              className="v3-icon-btn v3-burger app-mobile-menu-btn"
+              aria-label="Menu"
+              onClick={() => setMobileOpen((v) => !v)}
+            >
+              ☰
+            </button>
+          </div>
+          <div className="v3-topbar__right">
+            {user?.role === 'radiologist' && (
+              <span className="v3-rvu-pill" title="RVU (placeholder)">
+                RVU · —
+              </span>
+            )}
+            <div className="v3-profile">
+              <div className="v3-profile__avatar">{initials(user?.name ?? '')}</div>
+              <div className="v3-profile__text">
+                <strong>{user?.name}</strong>
+                <span>{subtitleRole}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="v3-icon-btn"
+              title={lang === 'fr' ? 'English' : 'Français'}
+              onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+            >
+              <span className="v3-lang-icon">{lang === 'fr' ? '🇺🇸' : '🇫🇷'}</span>
+            </button>
+            <button type="button" className="v3-icon-btn" title={t.logout} onClick={handleLogout}>
+              ⎋
+            </button>
+          </div>
         </header>
-        <main style={{ padding: '1rem', display: 'grid', gap: '1rem' }}>
+        <div className="v3-content">
           <Outlet />
-        </main>
+        </div>
       </div>
     </div>
   );

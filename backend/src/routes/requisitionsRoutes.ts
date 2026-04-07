@@ -994,7 +994,11 @@ router.get('/assigning/radiologist-pdf', requireAuth, requireRole(['admin']), as
 });
 
 // List requisitions for admins/clerical
-router.get('/', requireAuth, requireRole(['admin', 'clerical']), async (_req, res) => {
+router.get(
+  '/',
+  requireAuth,
+  requireRole(['admin', 'clerical', 'radiologist', 'physician', 'technologist']),
+  async (_req, res) => {
   try {
     const requisitions = await Requisition.findAll({
       order: [['id', 'DESC']],
