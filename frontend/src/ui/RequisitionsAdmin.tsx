@@ -403,6 +403,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
       setImportResult('Categories are still loading. Please wait and try again.');
       return;
     }
+    if (!window.confirm('Import requisitions from this Excel file?')) return;
 
     setImporting(true);
     setImportResult(null);
@@ -650,6 +651,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
 
   const handleApprove = async (id: number) => {
     if (!token) return;
+    if (!window.confirm('Approve this requisition?')) return;
     setSavingId(id);
     try {
       await approveRequisition(token, id);
