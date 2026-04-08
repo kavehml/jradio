@@ -15,6 +15,7 @@ import {
   swapAssigningCases,
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
+import { useAppStrings } from '../i18n/useAppStrings';
 
 type ShiftChoice = 'AM' | 'PM' | 'NIGHT' | 'NA';
 
@@ -27,6 +28,7 @@ interface ParticipantRow {
 
 export const AssigningTab: React.FC = () => {
   const { token } = useAuth();
+  const a = useAppStrings().assigning;
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [shift, setShift] = useState<ShiftChoice>('AM');
   const [summary, setSummary] = useState<AssigningSummary | null>(null);
@@ -306,14 +308,14 @@ export const AssigningTab: React.FC = () => {
 
   return (
     <section style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: '1rem' }}>
-      <h3 style={{ margin: 0 }}>Assigning</h3>
+      <h3 style={{ margin: 0 }}>{a.title}</h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'end' }}>
         <label style={{ minWidth: 180 }}>
-          Date
+          {a.date}
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label style={{ minWidth: 150 }}>
-          Shift
+          {a.shift}
           <select value={shift} onChange={(e) => setShift(e.target.value as ShiftChoice)}>
             <option value="AM">AM</option>
             <option value="PM">PM</option>
@@ -322,7 +324,7 @@ export const AssigningTab: React.FC = () => {
           </select>
         </label>
         <button type="button" onClick={() => void loadAssigningContext()} disabled={loading}>
-          {loading ? 'Loading...' : 'Refresh'}
+          {loading ? a.loadingRefresh : a.refresh}
         </button>
       </div>
 
@@ -338,21 +340,31 @@ export const AssigningTab: React.FC = () => {
             padding: '0.75rem',
           }}
         >
-          <div>Approved for slot: {summary.approvedForShiftCount}</div>
-          <div>Eligible to assign: {summary.eligibleCount}</div>
-          <div>Already assigned: {summary.alreadyAssignedCount}</div>
-          <div>Completed (locked): {summary.completedCount ?? 0}</div>
-          <div>Total eligible RVU: {summary.totalRvu}</div>
-          <div>Total member weight: {totalWeight.toFixed(2)}</div>
+          <div>
+            {a.approvedForSlot} {summary.approvedForShiftCount}
+          </div>
+          <div>
+            {a.eligibleToAssign} {summary.eligibleCount}
+          </div>
+          <div>
+            {a.alreadyAssigned} {summary.alreadyAssignedCount}
+          </div>
+          <div>
+            {a.completedLocked} {summary.completedCount ?? 0}
+          </div>
+          <div>
+            {a.totalEligibleRvu} {summary.totalRvu}
+          </div>
+          <div>
+            {a.totalMemberWeight} {totalWeight.toFixed(2)}
+          </div>
         </div>
       )}
 
       <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem', display: 'grid', gap: 10 }}>
-        <strong>Radiologists for this shift</strong>
+        <strong>{a.radiologistsForShift}</strong>
         {shift === 'NA' && (
-          <p style={{ margin: 0, color: '#475569', fontSize: '0.86rem' }}>
-            N/A (All day) auto-loads radiologists from AM, PM, and Night shifts on this date.
-          </p>
+          <p style={{ margin: 0, color: '#475569', fontSize: '0.86rem' }}>{a.naAllDayHint}</p>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <select
@@ -360,7 +372,7 @@ export const AssigningTab: React.FC = () => {
             onChange={(e) => setSelectedRadiologistId(e.target.value ? Number(e.target.value) : null)}
             style={{ minWidth: 260 }}
           >
-            <option value="">Select radiologist</option>
+            <option value="">{a.selectRadiologist}</option>
             {availableToAdd.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
@@ -368,7 +380,7 @@ export const AssigningTab: React.FC = () => {
             ))}
           </select>
           <button type="button" onClick={addRadiologist} disabled={!selectedRadiologistId}>
-            Add radiologist
+            {a.addRadiologist}
           </button>
         </div>
 
@@ -376,10 +388,10 @@ export const AssigningTab: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Radiologist</th>
-                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Source</th>
-                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Weight</th>
-                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Actions</th>
+                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.radiologist}</th>
+                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.source}</th>
+                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.weight}</th>
+                <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -387,7 +399,7 @@ export const AssigningTab: React.FC = () => {
                 <tr key={p.radiologistId}>
                   <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>{p.name}</td>
                   <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
-                    {p.fromCalendar ? 'Calendar auto-added' : 'Manual'}
+                    {p.fromCalendar ? a.calendarAuto : a.manual}
                   </td>
                   <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9', maxWidth: 120 }}>
                     <input
@@ -412,7 +424,7 @@ export const AssigningTab: React.FC = () => {
                         setParticipants((prev) => prev.filter((x) => x.radiologistId !== p.radiologistId))
                       }
                     >
-                      Remove
+                      {a.remove}
                     </button>
                   </td>
                 </tr>
@@ -420,7 +432,7 @@ export const AssigningTab: React.FC = () => {
               {participants.length === 0 && (
                 <tr>
                   <td colSpan={4} style={{ padding: '0.6rem', color: '#94a3b8' }}>
-                    No radiologists selected yet.
+                    {a.noRadiologistsYet}
                   </td>
                 </tr>
               )}
@@ -435,7 +447,7 @@ export const AssigningTab: React.FC = () => {
           onClick={() => void runDistribution()}
           disabled={distributing || participants.length === 0 || (summary?.eligibleCount ?? 0) === 0}
         >
-          {distributing ? 'Distributing...' : 'Distribute / Redistribute'}
+          {distributing ? a.distributing : a.distribute}
         </button>
         {message && <span style={{ color: '#166534' }}>{message}</span>}
         {error && <span style={{ color: '#b91c1c' }}>{error}</span>}
@@ -443,18 +455,18 @@ export const AssigningTab: React.FC = () => {
 
       {distributionResult && (
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem' }}>
-          <strong>Last distribution result</strong>
+          <strong>{a.lastDistribution}</strong>
           <div style={{ marginTop: 8, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Radiologist</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Weight</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Target RVU</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Assigned RVU</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Assigned cases</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>View schedule</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Worklist PDF</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.radiologist}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.weight}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.targetRvu}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.assignedRvu}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.assignedCases}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.viewList}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.downloadPdf}</th>
                 </tr>
               </thead>
               <tbody>
@@ -471,7 +483,7 @@ export const AssigningTab: React.FC = () => {
                         disabled={loadingWorklistFor === p.radiologistId}
                         onClick={() => void handleViewSchedule(p.radiologistId)}
                       >
-                        {loadingWorklistFor === p.radiologistId ? 'Loading...' : 'View list'}
+                        {loadingWorklistFor === p.radiologistId ? a.loadingRefresh : a.viewList}
                       </button>
                     </td>
                     <td style={{ padding: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
@@ -480,7 +492,7 @@ export const AssigningTab: React.FC = () => {
                         disabled={downloadingPdfFor === p.radiologistId}
                         onClick={() => void handleDownloadPdf(p.radiologistId, p.radiologistName)}
                       >
-                        {downloadingPdfFor === p.radiologistId ? 'Preparing...' : 'Download PDF'}
+                        {downloadingPdfFor === p.radiologistId ? a.preparing : a.downloadPdf}
                       </button>
                     </td>
                   </tr>
@@ -494,28 +506,28 @@ export const AssigningTab: React.FC = () => {
       {activeWorklist && (
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem' }}>
           <strong>
-            Worklist on page: {activeWorklist.radiologistName} ({activeWorklist.count})
+            {a.worklistOnPage} {activeWorklist.radiologistName} ({activeWorklist.count})
           </strong>
           <div style={{ marginTop: 6, color: '#475569', fontSize: '0.92rem' }}>
-            Done / Total: {activeWorklistCompletedCount} / {activeWorklist.rows.length}
+            {a.doneTotal} {activeWorklistCompletedCount} / {activeWorklist.rows.length}
           </div>
           <div style={{ marginTop: 8, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>MRN</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Name</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>DOB</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.mrn}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.name}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.dob}</th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                    Reported
+                    {a.reported}
                   </th>
                   <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                    Urgent findings
+                    {a.urgentFindings}
                   </th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Modality</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Sub-categories</th>
-                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>Notes</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.modality}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.category}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.subcats}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', borderBottom: '1px solid #e2e8f0' }}>{a.notes}</th>
                 </tr>
               </thead>
               <tbody>
@@ -551,7 +563,7 @@ export const AssigningTab: React.FC = () => {
                 {activeWorklist.rows.length === 0 && (
                   <tr>
                     <td colSpan={9} style={{ padding: '0.5rem', color: '#94a3b8' }}>
-                      No requisitions assigned for this radiologist in the selected date/shift.
+                      {a.noReqsForRad}
                     </td>
                   </tr>
                 )}
@@ -569,7 +581,7 @@ export const AssigningTab: React.FC = () => {
             }}
           >
             <label>
-              Swap from assignment ID
+              {a.swapFrom}
               <input
                 type="number"
                 value={swapFromAssignmentId}
@@ -578,7 +590,7 @@ export const AssigningTab: React.FC = () => {
               />
             </label>
             <label>
-              Swap to assignment ID
+              {a.swapTo}
               <input
                 type="number"
                 value={swapToAssignmentId}
@@ -587,11 +599,11 @@ export const AssigningTab: React.FC = () => {
               />
             </label>
             <label style={{ gridColumn: '1 / -1' }}>
-              Swap reason
+              {a.swapReason}
               <input
                 value={swapReason}
                 onChange={(e) => setSwapReason(e.target.value)}
-                placeholder="Distribution correction / personal relationship / other"
+                placeholder={a.swapReasonPh}
               />
             </label>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -600,11 +612,11 @@ export const AssigningTab: React.FC = () => {
                 checked={swapAllowUnequal}
                 onChange={(e) => setSwapAllowUnequal(e.target.checked)}
               />
-              Allow unequal RVU swap override
+              {a.allowUnequalRvu}
             </label>
             <div>
               <button type="button" disabled={swapping} onClick={() => void handleSwapCases()}>
-                {swapping ? 'Swapping…' : 'Swap cases'}
+                {swapping ? a.swapping : a.swapCases}
               </button>
             </div>
           </div>

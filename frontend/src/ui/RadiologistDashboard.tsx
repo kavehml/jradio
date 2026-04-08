@@ -10,12 +10,12 @@ import {
   UserDto,
 } from '../api';
 import { useAuth } from '../auth/AuthContext';
+import { useAppStrings } from '../i18n/useAppStrings';
 
 type ShiftType = 'AM' | 'PM' | 'NIGHT';
 type ViewMode = 'month' | 'week' | 'day';
 
 const SHIFT_TYPES: ShiftType[] = ['AM', 'PM', 'NIGHT'];
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function toIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -63,6 +63,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
   initialViewMode = 'month',
 }) => {
   const { token, user } = useAuth();
+  const rc = useAppStrings().radiologistCal;
   const isAdmin = user?.role === 'admin';
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
 
@@ -261,18 +262,16 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
     <section style={{ maxWidth: 1320, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ marginBottom: 4 }}>Radiologist Shift Calendar</h2>
-          <p style={{ margin: 0, color: '#64748b' }}>
-            Calendar-style booking with team coverage and RVU capacity per shift.
-          </p>
+          <h2 style={{ marginBottom: 4 }}>{rc.title}</h2>
+          <p style={{ margin: 0, color: '#64748b' }}>{rc.lead}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button type="button" onClick={() => moveView(-1)}>
-            Previous
+            {rc.previous}
           </button>
           <strong style={{ minWidth: 220, textAlign: 'center' }}>{headerLabel}</strong>
           <button type="button" onClick={() => moveView(1)}>
-            Next
+            {rc.next}
           </button>
           <div style={{ display: 'inline-flex', border: '1px solid #dbe2f0', borderRadius: 10, overflow: 'hidden' }}>
             {(['month', 'week', 'day'] as ViewMode[]).map((mode) => (
@@ -287,7 +286,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                   color: viewMode === mode ? 'white' : '#334155',
                 }}
               >
-                {mode[0].toUpperCase() + mode.slice(1)}
+                {mode === 'month' ? rc.month : mode === 'week' ? rc.week : rc.day}
               </button>
             ))}
           </div>
@@ -297,14 +296,12 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
       {isAdmin && (
         <div style={{ marginTop: 12, display: 'grid', gap: 8, maxWidth: 440 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>
-              Book shifts for radiologist
-            </span>
+            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{rc.bookForRad}</span>
             <select
               value={selectedRadiologistId ?? ''}
               onChange={(e) => setSelectedRadiologistId(Number(e.target.value))}
             >
-              <option value="">Select radiologist...</option>
+              <option value="">{rc.selectRad}</option>
               {radiologists.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
@@ -319,7 +316,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
         <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           {viewMode !== 'day' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e2e8f0' }}>
-              {WEEKDAY_LABELS.map((label) => (
+              {rc.weekdays.map((label) => (
                 <div key={label} style={{ padding: '0.6rem', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '0.84rem' }}>
                   {label}
                 </div>
@@ -368,7 +365,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                               color: mine ? '#9a4a20' : '#334155',
                             }}
                           >
-                            {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU
+                            {shiftType}: {cov?.radiologistCount || 0} {rc.rAbbr} / {cov?.totalMaxRvu || 0} {rc.rvu}
                           </div>
                         );
                       })}
@@ -419,7 +416,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                               color: mine ? '#9a4a20' : '#334155',
                             }}
                           >
-                            {shiftType}: {cov?.radiologistCount || 0} R / {cov?.totalMaxRvu || 0} RVU
+                            {shiftType}: {cov?.radiologistCount || 0} {rc.rAbbr} / {cov?.totalMaxRvu || 0} {rc.rvu}
                           </div>
                         );
                       })}
@@ -439,7 +436,8 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                   <div key={shiftType} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.7rem' }}>
                     <div style={{ fontWeight: 700, marginBottom: 6 }}>{shiftType}</div>
                     <div style={{ color: '#64748b', fontSize: '0.82rem' }}>
-                      Team: {cov?.radiologistCount || 0} radiologists • Capacity: {cov?.totalMaxRvu || 0} RVU
+                      {rc.team} {cov?.radiologistCount || 0} {rc.radiologists} • {rc.capacity}{' '}
+                      {cov?.totalMaxRvu || 0} {rc.rvu}
                     </div>
                     <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {(cov?.radiologists || []).map((r) => (
@@ -475,7 +473,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
             })}
           </h3>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Default Site</span>
+            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{rc.defaultSite}</span>
             <input value={defaultSite} onChange={(e) => setDefaultSite(e.target.value)} />
           </label>
           {message && (
@@ -497,11 +495,12 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                       disabled={savingKey === key}
                       onClick={() => void toggleShift(selectedDate, shiftType)}
                     >
-                      {savingKey === key ? 'Saving...' : mine ? 'Remove me' : 'Book me'}
+                      {savingKey === key ? rc.saving : mine ? rc.removeMe : rc.bookMe}
                     </button>
                   </div>
                   <div style={{ marginTop: 6, color: '#64748b', fontSize: '0.82rem' }}>
-                    Team: {cov?.radiologistCount || 0} radiologists • Capacity: {cov?.totalMaxRvu || 0} RVU
+                    {rc.team} {cov?.radiologistCount || 0} {rc.radiologists} • {rc.capacity}{' '}
+                    {cov?.totalMaxRvu || 0} {rc.rvu}
                   </div>
                   <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {(cov?.radiologists || []).map((r) => (
@@ -521,7 +520,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                     ))}
                     {!cov?.radiologists?.length && (
                       <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
-                        No radiologists booked yet.
+                        {rc.noRadBooked}
                       </span>
                     )}
                   </div>
@@ -529,7 +528,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                     <input
                       type="number"
                       min={0}
-                      placeholder={isAdmin ? 'Selected radiologist max RVU' : 'My max RVU for this shift'}
+                      placeholder={isAdmin ? rc.phMaxRvuAdmin : rc.phMaxRvuSelf}
                       value={localMaxRvu[key] ?? ''}
                       onChange={(e) => setLocalMaxRvu((prev) => ({ ...prev, [key]: e.target.value }))}
                     />
@@ -538,7 +537,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
                       disabled={!mine || savingKey === `${key}_capacity`}
                       onClick={() => void saveCapacity(selectedDate, shiftType)}
                     >
-                      {savingKey === `${key}_capacity` ? 'Saving...' : 'Save RVU'}
+                      {savingKey === `${key}_capacity` ? rc.saving : rc.saveRvu}
                     </button>
                   </div>
                 </div>
@@ -548,7 +547,7 @@ export const RadiologistDashboard: React.FC<{ initialViewMode?: ViewMode }> = ({
         </div>
       </div>
 
-      {loading && <p style={{ color: '#64748b' }}>Loading shifts...</p>}
+      {loading && <p style={{ color: '#64748b' }}>{rc.loadingShifts}</p>}
     </section>
   );
 };

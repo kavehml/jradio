@@ -145,7 +145,7 @@ export const AppLayout: React.FC = () => {
             <button
               type="button"
               className="v3-icon-btn v3-burger app-mobile-menu-btn"
-              aria-label="Menu"
+              aria-label={t.layout.menuAria}
               onClick={() => setMobileOpen((v) => !v)}
             >
               ☰
@@ -167,7 +167,7 @@ export const AppLayout: React.FC = () => {
             <button
               type="button"
               className="v3-icon-btn"
-              title={lang === 'fr' ? 'English' : 'Français'}
+              title={lang === 'fr' ? t.layout.langSwitchToEn : t.layout.langSwitchToFr}
               onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
             >
               <span className="v3-lang-icon">{lang === 'fr' ? '🇺🇸' : '🇫🇷'}</span>

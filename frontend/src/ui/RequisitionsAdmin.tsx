@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { useAuth } from '../auth/AuthContext';
+import { useAppStrings } from '../i18n/useAppStrings';
 import {
   approveRequisition,
   createRequisitionsBulk,
@@ -96,6 +97,8 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
   variant = 'full',
 }) => {
   const { token } = useAuth();
+  const tAll = useAppStrings();
+  const tr = tAll.requisitions;
   const canImport = variant === 'full';
   const canDelete = variant === 'full';
   const canEdit = variant !== 'technologist';
@@ -403,7 +406,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
       setImportResult('Categories are still loading. Please wait and try again.');
       return;
     }
-    if (!window.confirm('Import requisitions from this Excel file?')) return;
+    if (!window.confirm(tr.confirmImport)) return;
 
     setImporting(true);
     setImportResult(null);
@@ -651,7 +654,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
 
   const handleApprove = async (id: number) => {
     if (!token) return;
-    if (!window.confirm('Approve this requisition?')) return;
+    if (!window.confirm(tr.confirmApprove)) return;
     setSavingId(id);
     try {
       await approveRequisition(token, id);
@@ -746,7 +749,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
 
   const handleDelete = async (id: number) => {
     if (!token) return;
-    if (!window.confirm('Delete this requisition?')) return;
+    if (!window.confirm(tr.confirmDelete)) return;
     setSavingId(id);
     try {
       await deleteRequisition(token, id);
@@ -828,10 +831,10 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
 
   const pageTitle =
     variant === 'full'
-      ? 'All requisitions'
+      ? tr.titleAll
       : variant === 'radiologist'
-        ? 'Requisition search'
-        : 'Requisition list';
+        ? tr.titleSearch
+        : tr.titleList;
 
   return (
     <section className="v3-page" style={{ maxWidth: 1120, margin: '0 auto' }}>
@@ -852,7 +855,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <button type="button" onClick={() => void downloadExcelTemplate()}>
-            Download sample Excel
+            {tr.downloadSample}
           </button>
           <input
             type="file"
@@ -865,11 +868,11 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
             onClick={() => void handleImportExcel()}
             disabled={importing || !importFile}
           >
-            {importing ? 'Importing…' : 'Upload to requisitions'}
+            {importing ? tr.importing : tr.uploadToReqs}
           </button>
         </div>
         <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569' }}>
-          Use the template to add multiple requisitions in one upload.
+          {tr.importHelp}
         </p>
         {importResult && (
           <pre
@@ -889,31 +892,31 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
         )}
       </div>
       )}
-      {loading && <p>Loading requisitions…</p>}
+      {loading && <p>{tr.loading}</p>}
       {error && <p style={{ color: '#b91c1c' }}>{error}</p>}
       {!loading && !error && (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Visit #</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Patient ID</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.visitNum}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.patientId}</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>
-                  Ordering doctor
+                  {tr.orderingDoctor}
                 </th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Clinic</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Site</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Status</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Modality</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Category</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Subcategories</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Required specialty</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Additional notes</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>RVU</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Created</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Due date</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Shift</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Actions</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.clinic}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.site}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.status}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.modality}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.category}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.subcategories}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.requiredSpecialty}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.additionalNotes}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.rvu}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.created}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.dueDate}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.shift}</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{tr.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -946,7 +949,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           }))
                         }
                       >
-                        <option value="">Select...</option>
+                        <option value="">{tr.selectPlaceholder}</option>
                         {Array.from(
                           new Set([
                             ...categories.map((c) => c.modality),
@@ -978,7 +981,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           }))
                         }
                       >
-                        <option value="">Select...</option>
+                        <option value="">{tr.selectPlaceholder}</option>
                         {getCategoryOptions(r.id).map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}
@@ -1005,7 +1008,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                         >
                           {getSubCategoryOptionsForRow(r.id).length === 0 ? (
                             <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
-                              No predefined options for this category.
+                              {tr.noPredefinedSubcat}
                             </span>
                           ) : (
                             getSubCategoryOptionsForRow(r.id).map((s) => (
@@ -1028,7 +1031,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           <input
                             type="text"
                             disabled={!canEdit}
-                            placeholder="Add custom subcategory"
+                            placeholder={tr.addCustomSubcatPh}
                             value={subCategoryDraft[r.id] || ''}
                             onChange={(e) =>
                               setSubCategoryDraft((prev) => ({ ...prev, [r.id]: e.target.value }))
@@ -1042,7 +1045,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                             style={{ flex: 1, minWidth: 0 }}
                           />
                           <button type="button" disabled={!canEdit} onClick={() => addCustomSubCategory(r.id)}>
-                            Add
+                            {tAll.common.add}
                           </button>
                         </div>
                       </div>
@@ -1122,7 +1125,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           onClick={() => void handleUpdateSchedule(r.id)}
                           style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
                         >
-                          {savingId === r.id ? 'Saving…' : 'Save schedule'}
+                          {savingId === r.id ? tr.saving : tr.saveSchedule}
                         </button>
                       )}
                       {canEdit && r.status === 'pending_approval' && (
@@ -1132,7 +1135,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           onClick={() => void handleUpdateImaging(r.id)}
                           style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
                         >
-                          {savingId === r.id ? 'Saving…' : 'Save imaging'}
+                          {savingId === r.id ? tr.saving : tr.saveImaging}
                         </button>
                       )}
                       {canEdit && (
@@ -1142,7 +1145,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           onClick={() => void handleUpdateNotes(r.id)}
                           style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
                         >
-                          {savingId === r.id ? 'Saving…' : 'Save notes'}
+                          {savingId === r.id ? tr.saving : tr.saveNotes}
                         </button>
                       )}
                       {canEdit && r.status === 'pending_approval' && (
@@ -1153,7 +1156,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           onClick={() => void handleApprove(r.id)}
                           style={{ padding: '0.25rem 0.75rem', cursor: 'pointer' }}
                         >
-                          {savingId === r.id ? 'Saving…' : 'Approve'}
+                          {savingId === r.id ? tr.saving : tr.approve}
                         </button>
                       )}
                       {canDelete && (
@@ -1163,7 +1166,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
                           onClick={() => void handleDelete(r.id)}
                           style={{ padding: '0.25rem 0.75rem', cursor: 'pointer', color: '#b91c1c' }}
                         >
-                          {savingId === r.id ? 'Saving…' : 'Delete'}
+                          {savingId === r.id ? tr.saving : tr.delete}
                         </button>
                       )}
                     </div>
@@ -1173,7 +1176,7 @@ export const RequisitionsAdmin: React.FC<{ variant?: RequisitionsAdminVariant }>
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={16} style={{ padding: '0.75rem', color: '#94a3b8' }}>
-                    No requisitions yet.
+                    {tr.noReqsYet}
                   </td>
                 </tr>
               )}

@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginPage } from './auth/LoginPage';
 import { AppUiProvider } from './context/AppUiContext';
+import { LangHtmlSync } from './i18n/LangHtmlSync';
+import { useAppStrings } from './i18n/useAppStrings';
 import { AppLayout } from './ui/AppLayout';
 import { RadiologistDashboard } from './ui/RadiologistDashboard';
 import { ClericalIntake } from './ui/ClericalIntake';
@@ -25,7 +27,8 @@ import './styles.css';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading…</div>;
+  const t = useAppStrings();
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>{t.common.loading}</div>;
   if (!token) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -33,6 +36,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const Root = () => (
   <BrowserRouter>
     <AppUiProvider>
+      <LangHtmlSync />
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

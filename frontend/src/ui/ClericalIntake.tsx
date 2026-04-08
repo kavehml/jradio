@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useAppStrings } from '../i18n/useAppStrings';
 import {
   getImagingCategories,
   createRequisition,
@@ -25,6 +26,7 @@ interface Category {
 
 export const ClericalIntake: React.FC = () => {
   const { token } = useAuth();
+  const c = useAppStrings().clerical;
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -80,7 +82,7 @@ export const ClericalIntake: React.FC = () => {
         setSubCategoryMap(map);
         setTimeDelayOptions(delayOptions);
       } catch {
-        setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' });
+        setMessage({ type: 'err', text: c.loadError });
       } finally {
         setLoading(false);
       }
@@ -495,7 +497,7 @@ export const ClericalIntake: React.FC = () => {
       setNotes('');
       setSelectedCategory(null);
     } catch (err) {
-      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to create requisition' });
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : c.failedCreate });
     } finally {
       setSubmitting(false);
     }
@@ -503,16 +505,13 @@ export const ClericalIntake: React.FC = () => {
 
   return (
     <div className="v3-page v3-page--wide">
-      <h1 className="v3-page-title">Clerical intake</h1>
-      <p className="v3-page-lead">
-        Choose modality, then imaging category and exam types. Due date is derived from time delay and prior
-        imaging when applicable.
-      </p>
+      <h1 className="v3-page-title">{c.title}</h1>
+      <p className="v3-page-lead">{c.lead}</p>
 
       <form onSubmit={handleSubmit} className="v3-intake-formwrap">
         <div className="v3-intake-grid">
           <div className="v3-card v3-intake-card">
-            <div className="v3-card__header">Patient requisition information</div>
+            <div className="v3-card__header">{c.cardPatient}</div>
             <div className="v3-card__body" style={{ display: 'grid', gap: '0.85rem' }}>
               {message && (
                 <div
@@ -528,37 +527,37 @@ export const ClericalIntake: React.FC = () => {
                 </div>
               )}
               <label className="v3-field">
-                <span className="v3-field__label">Patient name *</span>
-                <p className="v3-field-hint">Enter the patient&apos;s first and last names.</p>
+                <span className="v3-field__label">{c.patientName}</span>
+                <p className="v3-field-hint">{c.patientNameHint}</p>
                 <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} required />
               </label>
               <label className="v3-field">
-                <span className="v3-field__label">Patient identifier *</span>
-                <p className="v3-field-hint">MRN, patient ID, or temporary label.</p>
+                <span className="v3-field__label">{c.patientId}</span>
+                <p className="v3-field-hint">{c.patientIdHint}</p>
                 <input type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
               </label>
               <label className="v3-field">
-                <span className="v3-field__label">Patient DOB *</span>
+                <span className="v3-field__label">{c.patientDob}</span>
                 <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} required />
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input type="checkbox" checked={isNewExternal} onChange={(e) => setIsNewExternal(e.target.checked)} />
-                <span>New external patient</span>
+                <span>{c.newExternal}</span>
               </label>
               <label className="v3-field">
-                <span className="v3-field__label">Ordering physician</span>
-                <p className="v3-field-hint">Name of the requesting physician.</p>
+                <span className="v3-field__label">{c.orderingPhysician}</span>
+                <p className="v3-field-hint">{c.orderingPhysicianHint}</p>
                 <input type="text" value={orderingDoctor} onChange={(e) => setOrderingDoctor(e.target.value)} />
               </label>
               <label className="v3-field">
-                <span className="v3-field__label">Requesting clinic</span>
-                <p className="v3-field-hint">Select a saved clinic or type a name.</p>
+                <span className="v3-field__label">{c.requestingClinic}</span>
+                <p className="v3-field-hint">{c.requestingClinicHint}</p>
                 <select
                   value={orderingClinic}
                   onChange={(e) => setOrderingClinic(e.target.value)}
                   style={{ marginBottom: 4 }}
                 >
-                  <option value="">Select saved clinic (optional)</option>
+                  <option value="">{c.selectClinicOptional}</option>
                   {clinicOptions.map((c) => (
                     <option key={c.id} value={c.name}>
                       {c.name}
@@ -569,14 +568,14 @@ export const ClericalIntake: React.FC = () => {
                   type="text"
                   value={orderingClinic}
                   onChange={(e) => setOrderingClinic(e.target.value)}
-                  placeholder="Or type clinic name…"
+                  placeholder={c.typeClinicPlaceholder}
                 />
               </label>
               <label className="v3-field">
-                <span className="v3-field__label">Site / reporting location</span>
-                <p className="v3-field-hint">Preferred site or reporting location.</p>
+                <span className="v3-field__label">{c.siteReporting}</span>
+                <p className="v3-field-hint">{c.siteHint}</p>
                 <select value={site} onChange={(e) => setSite(e.target.value)} style={{ marginBottom: 4 }}>
-                  <option value="">Select saved site (optional)</option>
+                  <option value="">{c.selectSiteOptional}</option>
                   {siteOptions.map((s) => (
                     <option key={s.id} value={s.name}>
                       {s.name}
@@ -587,27 +586,27 @@ export const ClericalIntake: React.FC = () => {
                   type="text"
                   value={site}
                   onChange={(e) => setSite(e.target.value)}
-                  placeholder="Or type site/location…"
+                  placeholder={c.typeSitePlaceholder}
                 />
               </label>
               <label className="v3-field">
-                <span className="v3-field__label">Date of request</span>
-                <p className="v3-field-hint">Date the request form is completed.</p>
+                <span className="v3-field__label">{c.dateOfRequest}</span>
+                <p className="v3-field-hint">{c.dateOfRequestHint}</p>
                 <input type="date" value={dateOfRequest} onChange={(e) => setDateOfRequest(e.target.value)} />
               </label>
             </div>
           </div>
 
           <div className="v3-card v3-intake-card">
-            <div className="v3-card__header">Exam requisition information</div>
+            <div className="v3-card__header">{c.cardExam}</div>
             <div className="v3-card__body" style={{ display: 'grid', gap: '0.85rem' }}>
               {loading ? (
-                <p style={{ color: 'var(--v3-muted)' }}>Loading categories…</p>
+                <p style={{ color: 'var(--v3-muted)' }}>{c.loadingCategories}</p>
               ) : (
                 <>
                   <div className="v3-field">
-                    <span className="v3-field__label">Modality *</span>
-                    <p className="v3-field-hint">Choose the imaging modality.</p>
+                    <span className="v3-field__label">{c.modality}</span>
+                    <p className="v3-field-hint">{c.modalityHint}</p>
                     <div className="v3-pill-group">
                       {['X-ray', 'CT', 'MRI', 'US', 'PET'].map((m) => (
                         <button
@@ -628,7 +627,7 @@ export const ClericalIntake: React.FC = () => {
                   </div>
           {modality && (
             <>
-              <h3 style={{ marginBottom: '0.5rem' }}>Imaging category</h3>
+              <h3 style={{ marginBottom: '0.5rem' }}>{c.imagingCategory}</h3>
               <div
                 style={{
                   display: 'grid',
@@ -663,13 +662,13 @@ export const ClericalIntake: React.FC = () => {
                   </button>
                 ))}
                 {filteredCategories.length === 0 && (
-                  <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>No categories configured for this modality yet.</div>
+                  <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>{c.noCategoriesModality}</div>
                 )}
               </div>
               {selectedCategory && (
                 <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <span>Exam type within this category</span>
+                    <span>{c.examTypeInCategory}</span>
                     <div
                       style={{
                         display: 'grid',
@@ -713,7 +712,7 @@ export const ClericalIntake: React.FC = () => {
                   </label>
                   {modality === 'MRI' && getMriSequenceOptions(selectedCategory).length > 0 && (
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <span>Typical sequences</span>
+                      <span>{c.typicalSequences}</span>
                       <div
                         style={{
                           display: 'grid',
@@ -761,10 +760,10 @@ export const ClericalIntake: React.FC = () => {
             </>
           )}
                   <label className="v3-field">
-                    <span className="v3-field__label">Time delay allowed</span>
-                    <p className="v3-field-hint">Supports automatic due-date rules where configured.</p>
+                    <span className="v3-field__label">{c.timeDelay}</span>
+                    <p className="v3-field-hint">{c.timeDelayHint}</p>
                     <select value={timeDelayPreset} onChange={(e) => setTimeDelayPreset(e.target.value)}>
-                      <option value="">Not specified</option>
+                      <option value="">{c.notSpecified}</option>
                       {timeDelayOptions.map((opt) => (
                         <option key={opt.code} value={opt.code}>
                           {opt.label}
@@ -778,16 +777,16 @@ export const ClericalIntake: React.FC = () => {
                       checked={hasImagingWithin24h}
                       onChange={(e) => setHasImagingWithin24h(e.target.checked)}
                     />
-                    <span>Patient has relevant imaging within last 24 hours</span>
+                    <span>{c.imaging24h}</span>
                   </label>
                   <label className="v3-field">
-                    <span className="v3-field__label">Clinical notes</span>
-                    <p className="v3-field-hint">History or context for the reading team.</p>
+                    <span className="v3-field__label">{c.clinicalNotes}</span>
+                    <p className="v3-field-hint">{c.clinicalNotesHint}</p>
                     <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
                   </label>
                   <div className="v3-btn-row">
                     <button type="submit" disabled={submitting} className="v3-btn--primary">
-                      {submitting ? 'Submitting…' : 'Submit exam requisition'}
+                      {submitting ? c.submitting : c.submit}
                     </button>
                   </div>
                 </>

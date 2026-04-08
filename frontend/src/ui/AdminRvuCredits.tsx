@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRvuCredit, getRvuCredits, getUsers, RvuCreditEntryDto } from '../api';
 import { useAuth } from '../auth/AuthContext';
+import { useAppStrings } from '../i18n/useAppStrings';
 
 export const AdminRvuCredits: React.FC = () => {
   const { token } = useAuth();
+  const rv = useAppStrings().rvuPage;
+  const tr = useAppStrings().requisitions;
   const [entries, setEntries] = useState<RvuCreditEntryDto[]>([]);
   const [radiologists, setRadiologists] = useState<Array<{ id: number; name: string }>>([]);
   const [radiologistId, setRadiologistId] = useState<number | ''>('');
@@ -34,7 +37,7 @@ export const AdminRvuCredits: React.FC = () => {
       );
       setEntries(creditRes.entries);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load RVU credits');
+      setError(e instanceof Error ? e.message : rv.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -61,10 +64,10 @@ export const AdminRvuCredits: React.FC = () => {
     if (!token || !radiologistId) return;
     const parsedAmount = Number(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setError('Amount must be a positive integer.');
+      setError(rv.errAmountPositive);
       return;
     }
-    if (!window.confirm('Add this RVU credit entry? It will be applied to the selected date.')) return;
+    if (!window.confirm(rv.confirmAdd)) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -76,12 +79,12 @@ export const AdminRvuCredits: React.FC = () => {
         applyDate,
         note: note.trim() || undefined,
       });
-      setMessage('RVU credit added successfully.');
+      setMessage(rv.addedOk);
       setAmount('1');
       setNote('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create RVU credit');
+      setError(e instanceof Error ? e.message : rv.createFailed);
     } finally {
       setSaving(false);
     }
@@ -89,72 +92,81 @@ export const AdminRvuCredits: React.FC = () => {
 
   return (
     <section className="v3-page" style={{ maxWidth: 1000, margin: '0 auto' }}>
-      <h1 className="v3-page-title" style={{ fontSize: '1.35rem' }}>RVU credits</h1>
-      <p className="v3-page-lead">
-        Admin-only manual credits. Earned and given categories are tracked separately, but both add RVU to the
-        radiologist's workload on the selected apply date.
-      </p>
+      <h1 className="v3-page-title" style={{ fontSize: '1.35rem' }}>
+        {rv.title}
+      </h1>
+      <p className="v3-page-lead">{rv.lead}</p>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-        <div className="v3-rvu-pill">Total: {summary.total}</div>
-        <div className="v3-rvu-pill">Earned: {summary.earned}</div>
-        <div className="v3-rvu-pill">Given: {summary.given}</div>
+        <div className="v3-rvu-pill">
+          {rv.total} {summary.total}
+        </div>
+        <div className="v3-rvu-pill">
+          {rv.earned} {summary.earned}
+        </div>
+        <div className="v3-rvu-pill">
+          {rv.given} {summary.given}
+        </div>
       </div>
 
       {message && <p style={{ color: '#166534' }}>{message}</p>}
       {error && <p style={{ color: '#b91c1c' }}>{error}</p>}
 
       <form onSubmit={handleCreate} className="v3-card" style={{ marginBottom: 16 }}>
-        <div className="v3-card__header">Add credit entry</div>
+        <div className="v3-card__header">{rv.addEntry}</div>
         <div className="v3-card__body" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
           <label>
-            Radiologist
+            {rv.radiologist}
             <select value={radiologistId} onChange={(e) => setRadiologistId(Number(e.target.value) || '')} required>
-              <option value="">Select...</option>
+              <option value="">{tr.selectPlaceholder}</option>
               {radiologists.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
               ))}
             </select>
           </label>
           <label>
-            Category
+            {rv.category}
             <select value={creditType} onChange={(e) => setCreditType(e.target.value as 'earned' | 'given')}>
-              <option value="earned">Earned credits</option>
-              <option value="given">Given credits</option>
+              <option value="earned">{rv.earnedCredits}</option>
+              <option value="given">{rv.givenCredits}</option>
             </select>
           </label>
           <label>
-            RVU amount
+            {rv.amount}
             <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} required />
           </label>
           <label>
-            Apply date
+            {rv.applyDate}
             <input type="date" value={applyDate} onChange={(e) => setApplyDate(e.target.value)} required />
           </label>
           <label style={{ gridColumn: '1 / -1' }}>
-            Note (optional)
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason / context" />
+            {rv.noteOptional}
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={rv.notePlaceholder} />
           </label>
           <div>
-            <button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Add RVU credit'}</button>
+            <button type="submit" disabled={saving}>
+              {saving ? rv.saving : rv.addCredit}
+            </button>
           </div>
         </div>
       </form>
 
       <div className="v3-card">
-        <div className="v3-card__header">Credit history</div>
+        <div className="v3-card__header">{rv.history}</div>
         <div className="v3-card__body" style={{ overflowX: 'auto' }}>
           {loading ? (
-            <p>Loading credits…</p>
+            <p>{rv.loading}</p>
           ) : (
             <table>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: 8 }}>Apply date</th>
-                  <th style={{ textAlign: 'left', padding: 8 }}>Radiologist</th>
-                  <th style={{ textAlign: 'left', padding: 8 }}>Category</th>
-                  <th style={{ textAlign: 'left', padding: 8 }}>Amount</th>
-                  <th style={{ textAlign: 'left', padding: 8 }}>Note</th>
+                  <th style={{ textAlign: 'left', padding: 8 }}>{rv.colApplyDate}</th>
+                  <th style={{ textAlign: 'left', padding: 8 }}>{rv.colRad}</th>
+                  <th style={{ textAlign: 'left', padding: 8 }}>{rv.colCategory}</th>
+                  <th style={{ textAlign: 'left', padding: 8 }}>{rv.colAmount}</th>
+                  <th style={{ textAlign: 'left', padding: 8 }}>{rv.colNote}</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,7 +181,9 @@ export const AdminRvuCredits: React.FC = () => {
                 ))}
                 {entries.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: 8, color: '#64748b' }}>No credit entries yet.</td>
+                    <td colSpan={5} style={{ padding: 8, color: '#64748b' }}>
+                      {rv.noEntries}
+                    </td>
                   </tr>
                 )}
               </tbody>

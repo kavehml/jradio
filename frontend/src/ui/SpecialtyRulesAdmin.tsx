@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useAppStrings } from '../i18n/useAppStrings';
 import {
   createImagingSubCategory,
   getImagingCategories,
@@ -106,6 +107,7 @@ function getSubCategoryOptions(cat: Category): string[] {
 
 export const SpecialtyRulesAdmin: React.FC = () => {
   const { token } = useAuth();
+  const sp = useAppStrings().specialty;
   const [categories, setCategories] = useState<Category[]>([]);
   const [rulesMap, setRulesMap] = useState<Record<string, string[]>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -165,7 +167,7 @@ export const SpecialtyRulesAdmin: React.FC = () => {
         subCategory,
         requiredSubspecialties: rulesMap[k] || ['general'],
       });
-      setMessage('Saved.');
+      setMessage(sp.savedMsg);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Failed to save rule');
     } finally {
@@ -184,7 +186,7 @@ export const SpecialtyRulesAdmin: React.FC = () => {
         [category.id]: Array.from(new Set([...(prev[category.id] || []), value])),
       }));
       setNewSubByCategory((prev) => ({ ...prev, [category.id]: '' }));
-      setMessage('Saved.');
+      setMessage(sp.savedMsg);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Failed to add subcategory');
     }
@@ -192,11 +194,11 @@ export const SpecialtyRulesAdmin: React.FC = () => {
 
   return (
     <section style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <h2>Service to subspecialty mapping</h2>
-      <p style={{ color: '#4b5563' }}>
-        Default is General. Update one or more subspecialties for any modality/category/subcategory.
-      </p>
-      {message && <p style={{ color: message === 'Saved.' ? '#166534' : '#b91c1c' }}>{message}</p>}
+      <h2>{sp.title}</h2>
+      <p style={{ color: '#4b5563' }}>{sp.lead}</p>
+      {message && (
+        <p style={{ color: message === sp.savedMsg ? '#166534' : '#b91c1c' }}>{message}</p>
+      )}
       {Object.entries(grouped).map(([modality, cats]) => (
         <div key={modality} style={{ background: 'white', padding: '1rem', borderRadius: 8, marginBottom: '1rem' }}>
           <h3 style={{ marginTop: 0 }}>{modality}</h3>
@@ -215,17 +217,17 @@ export const SpecialtyRulesAdmin: React.FC = () => {
                       onChange={(e) =>
                         setNewSubByCategory((prev) => ({ ...prev, [cat.id]: e.target.value }))
                       }
-                      placeholder="Add subcategory..."
+                      placeholder={sp.addSubPh}
                       style={{ minWidth: 280 }}
                     />
                     <button type="button" onClick={() => void handleAddSubCategory(cat)}>
-                      Add subcategory
+                      {sp.addSubBtn}
                     </button>
                   </div>
 
                   {subOptions.length > 0 && (
                     <div style={{ marginTop: 12 }}>
-                      <strong>Subcategories (rules apply only here)</strong>
+                      <strong>{sp.subcatRulesHeader}</strong>
                       {subOptions.map((sub) => {
                         const subKey = keyOf(cat.modality, cat.name, sub);
                         const subSubs = rulesMap[subKey] || ['general'];
@@ -245,7 +247,7 @@ export const SpecialtyRulesAdmin: React.FC = () => {
                               ))}
                             </div>
                             <button type="button" onClick={() => void saveRow(cat.modality, cat.name, sub)} disabled={savingKey === subKey}>
-                              {savingKey === subKey ? 'Saving…' : 'Save subcategory rule'}
+                              {savingKey === subKey ? sp.saving : sp.saveRule}
                             </button>
                           </div>
                         );

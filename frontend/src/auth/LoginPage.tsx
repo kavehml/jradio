@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAppStrings } from '../i18n/useAppStrings';
 import { useAuth } from './AuthContext';
 
 export function LoginPage() {
+  const s = useAppStrings();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +25,7 @@ export function LoginPage() {
       else if (user.role === 'technologist') navigate('/technologist', { replace: true });
       else navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : s.login.loginFailed);
     } finally {
       setSubmitting(false);
     }
@@ -33,12 +35,12 @@ export function LoginPage() {
     <div className="v3-login-bg">
       <div className="v3-login-brand">
         <div className="v3-login-logo" aria-hidden />
-        <div className="v3-login-brand-name">Radiology workload</div>
+        <div className="v3-login-brand-name">{s.layout.brandLine}</div>
       </div>
 
       <form className="v3-login-card" onSubmit={handleSubmit}>
-        <h1 className="v3-login-app-title">Radiology RVU workload app</h1>
-        <p className="v3-login-sub">Sign in with your work email and password.</p>
+        <h1 className="v3-login-app-title">{s.login.title}</h1>
+        <p className="v3-login-sub">{s.login.subtitle}</p>
 
         {error && (
           <div
@@ -56,18 +58,18 @@ export function LoginPage() {
         )}
 
         <label className="v3-field">
-          <span>E-mail</span>
+          <span>{s.login.email}</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            placeholder="you@hospital.org"
+            placeholder={s.login.emailPlaceholder}
           />
         </label>
         <label className="v3-field">
-          <span>Password</span>
+          <span>{s.login.password}</span>
           <input
             type="password"
             value={password}
@@ -79,22 +81,22 @@ export function LoginPage() {
         </label>
 
         <button type="submit" disabled={submitting} className="v3-login-submit">
-          {submitting ? 'Signing in…' : 'Sign in'}
+          {submitting ? s.login.signingIn : s.login.signIn}
         </button>
 
         <a className="v3-login-forgot" href="#" onClick={(e) => e.preventDefault()}>
-          Forgot password?
+          {s.login.forgotPassword}
         </a>
       </form>
 
       <p className="v3-login-footer">
-        Don’t have an account?{' '}
+        {s.login.noAccount}{' '}
         <Link to="/signup" className="v3-link">
-          Request access
+          {s.login.requestAccess}
         </Link>
         {' · '}
         <Link to="/external-requisition" className="v3-link">
-          Public requisition
+          {s.login.publicRequisition}
         </Link>
       </p>
     </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAppStrings } from '../i18n/useAppStrings';
 import {
   getPublicImagingCategories,
   createPublicRequisition,
@@ -18,6 +19,9 @@ interface Category {
 }
 
 export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
+  const s = useAppStrings();
+  const c = s.clerical;
+  const p = s.publicForm;
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -63,7 +67,7 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
         setSubCategoryMap(map);
         setTimeDelayOptions(delayOptions);
       })
-      .catch(() => setMessage({ type: 'err', text: 'Failed to load imaging categories/clinics/sites' }))
+      .catch(() => setMessage({ type: 'err', text: p.loadError }))
       .finally(() => setLoading(false));
   }, []);
 
@@ -416,7 +420,7 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
     if (!modality || !patientId.trim() || !patientName.trim() || !patientDob) {
       setMessage({
         type: 'err',
-        text: 'Required fields: Patient name, MRN/Patient ID, Patient DOB, and modality.',
+        text: p.requiredFieldsError,
       });
       return;
     }
@@ -448,7 +452,11 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
             .filter(Boolean)
             .join('\n') || undefined,
       });
-      setMessage({ type: 'ok', text: `Requisition submitted. Visit #${(result as { visitNumber?: string }).visitNumber}.` });
+      const vn = String((result as { visitNumber?: string }).visitNumber ?? '');
+      setMessage({
+        type: 'ok',
+        text: p.submitSuccess.replace('{{visit}}', vn),
+      });
       setPatientId('');
       setPatientName('');
       setPatientDob('');
@@ -463,7 +471,7 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
       setNotes('');
       setSelectedCategory(null);
     } catch (err) {
-      setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to create requisition' });
+      setMessage({ type: 'err', text: err instanceof Error ? err.message : c.failedCreate });
     } finally {
       setSubmitting(false);
     }
@@ -480,19 +488,18 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
     >
       {!embedded && (
         <>
-          <h2 className="v3-page-title">External requisition form</h2>
+          <h2 className="v3-page-title">{p.externalTitle}</h2>
           <p className="v3-page-lead" style={{ maxWidth: 720 }}>
-            This form is for clinics outside the radiology department to request imaging. Please complete
-            all required fields as accurately as possible.
+            {p.externalLead}
           </p>
         </>
       )}
 
       {loading ? (
-        <p>Loading categories…</p>
+        <p>{c.loadingCategories}</p>
       ) : (
         <>
-          <h3 style={{ marginBottom: '0.5rem' }}>Modality *</h3>
+          <h3 style={{ marginBottom: '0.5rem' }}>{c.modality}</h3>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             {['X-ray', 'CT', 'MRI', 'US', 'PET'].map((m) => (
               <button
@@ -521,7 +528,7 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
           </div>
           {modality && (
             <>
-              <h3 style={{ marginBottom: '0.5rem' }}>Imaging category</h3>
+              <h3 style={{ marginBottom: '0.5rem' }}>{c.imagingCategory}</h3>
               <div
                 style={{
                   display: 'grid',
@@ -556,13 +563,13 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
                   </button>
                 ))}
                 {filteredCategories.length === 0 && (
-                  <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>No categories configured for this modality yet.</div>
+                  <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>{c.noCategoriesModality}</div>
                 )}
               </div>
               {selectedCategory && (
                 <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <span>Exam type within this category</span>
+                    <span>{c.examTypeInCategory}</span>
                     <div
                       style={{
                         display: 'grid',
@@ -606,7 +613,7 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
                   </label>
                   {modality === 'MRI' && getMriSequenceOptions(selectedCategory).length > 0 && (
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <span>Typical sequences</span>
+                      <span>{c.typicalSequences}</span>
                       <div
                         style={{
                           display: 'grid',
@@ -687,15 +694,15 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
           </div>
         )}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient identifier (MRN or temp label) *</span>
+          <span>{p.patientIdLabel}</span>
           <input type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient name *</span>
+          <span>{c.patientName}</span>
           <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Patient DOB *</span>
+          <span>{c.patientDob}</span>
           <input type="date" value={patientDob} onChange={(e) => setPatientDob(e.target.value)} required />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -704,10 +711,10 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
             checked={isNewExternal}
             onChange={(e) => setIsNewExternal(e.target.checked)}
           />
-          <span>New external patient</span>
+          <span>{c.newExternal}</span>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Ordering doctor</span>
+          <span>{c.orderingPhysician}</span>
           <input
             type="text"
             value={orderingDoctor}
@@ -715,13 +722,13 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Clinic</span>
+          <span>{p.clinicLabel}</span>
           <select
             value={orderingClinic}
             onChange={(e) => setOrderingClinic(e.target.value)}
             style={{ marginBottom: 4 }}
           >
-            <option value="">Select saved clinic (optional)</option>
+            <option value="">{c.selectClinicOptional}</option>
             {clinicOptions.map((c) => (
               <option key={c.id} value={c.name}>
                 {c.name}
@@ -732,13 +739,13 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
             type="text"
             value={orderingClinic}
             onChange={(e) => setOrderingClinic(e.target.value)}
-            placeholder="Or type clinic name…"
+            placeholder={c.typeClinicPlaceholder}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Site / location</span>
+          <span>{p.siteLabel}</span>
           <select value={site} onChange={(e) => setSite(e.target.value)} style={{ marginBottom: 4 }}>
-            <option value="">Select saved site (optional)</option>
+            <option value="">{c.selectSiteOptional}</option>
             {siteOptions.map((s) => (
               <option key={s.id} value={s.name}>
                 {s.name}
@@ -749,17 +756,17 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
             type="text"
             value={site}
             onChange={(e) => setSite(e.target.value)}
-            placeholder="Or type site/location…"
+            placeholder={c.typeSitePlaceholder}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Date of request</span>
+          <span>{c.dateOfRequest}</span>
           <input type="date" value={dateOfRequest} onChange={(e) => setDateOfRequest(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Time delay allowed</span>
+          <span>{c.timeDelay}</span>
           <select value={timeDelayPreset} onChange={(e) => setTimeDelayPreset(e.target.value)}>
-            <option value="">Not specified</option>
+            <option value="">{c.notSpecified}</option>
             {timeDelayOptions.map((opt) => (
               <option key={opt.code} value={opt.code}>
                 {opt.label}
@@ -773,10 +780,10 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
             checked={hasImagingWithin24h}
             onChange={(e) => setHasImagingWithin24h(e.target.checked)}
           />
-          <span>Patient has relevant imaging within last 24 hours</span>
+          <span>{c.imaging24h}</span>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span>Additional notes</span>
+          <span>{p.additionalNotes}</span>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </label>
         <button
@@ -784,7 +791,7 @@ export const PublicRequisitionForm: React.FC<{ embedded?: boolean }> = ({ embedd
           disabled={submitting}
           style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', cursor: submitting ? 'not-allowed' : 'pointer' }}
         >
-          {submitting ? 'Submitting…' : 'Submit requisition'}
+          {submitting ? c.submitting : p.submitRequisition}
         </button>
       </form>
     </section>

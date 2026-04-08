@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useAppStrings } from '../i18n/useAppStrings';
 import {
   createTimeDelayOption,
   updateTimeDelayOption,
@@ -17,6 +18,9 @@ import {
 
 export const AdminDashboard: React.FC = () => {
   const { token, user } = useAuth();
+  const t = useAppStrings();
+  const adm = t.admin;
+  const co = t.common;
   const canAddUsers = user?.role === 'admin';
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -222,13 +226,11 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <section style={{ maxWidth: 1024, margin: '0 auto' }}>
-      <h2>Setting</h2>
-      <p style={{ color: '#4b5563', marginBottom: '1rem' }}>
-        Add radiologists, clerical staff, or other admins. Manage shifts and requisitions from here.
-      </p>
+      <h2>{adm.settingsTitle}</h2>
+      <p style={{ color: '#4b5563', marginBottom: '1rem' }}>{adm.settingsLead}</p>
 
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)', marginBottom: '1.5rem' }}>
-        <h3 style={{ marginTop: 0 }}>Add user</h3>
+        <h3 style={{ marginTop: 0 }}>{adm.addUser}</h3>
         {message && (
           <div
             style={{
@@ -244,23 +246,23 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
         {!canAddUsers ? (
-          <p style={{ margin: 0, color: '#64748b' }}>Only admins can add users.</p>
+          <p style={{ margin: 0, color: '#64748b' }}>{adm.onlyAdminsAdd}</p>
         ) : (
           <form onSubmit={handleAddUser} style={{ display: 'grid', gap: '0.75rem', maxWidth: 400 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span>Name</span>
+              <span>{adm.name}</span>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span>Email</span>
+              <span>{adm.email}</span>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span>Password</span>
+              <span>{adm.password}</span>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span>Role</span>
+              <span>{adm.role}</span>
               <select
                 value={role}
                 onChange={(e) =>
@@ -274,15 +276,15 @@ export const AdminDashboard: React.FC = () => {
                   )
                 }
               >
-                <option value="radiologist">Radiologist</option>
-                <option value="clerical">Clerical</option>
-                <option value="physician">Physician</option>
-                <option value="technologist">Technologist</option>
-                <option value="admin">Admin</option>
+                <option value="radiologist">{adm.roleRadiologist}</option>
+                <option value="clerical">{adm.roleClerical}</option>
+                <option value="physician">{adm.rolePhysician}</option>
+                <option value="technologist">{adm.roleTechnologist}</option>
+                <option value="admin">{adm.roleAdmin}</option>
               </select>
             </label>
             <button type="submit" style={{ padding: '0.5rem 1rem', cursor: 'pointer', marginTop: '0.25rem' }}>
-              Add user
+              {adm.addUserBtn}
             </button>
           </form>
         )}
@@ -297,17 +299,17 @@ export const AdminDashboard: React.FC = () => {
         }}
       >
         <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
-          <h3 style={{ marginTop: 0 }}>Clinics</h3>
+          <h3 style={{ marginTop: 0 }}>{adm.clinics}</h3>
           <form onSubmit={handleAddClinic} style={{ display: 'flex', gap: 8, marginBottom: '0.75rem' }}>
             <input
               type="text"
               value={newClinicName}
               onChange={(e) => setNewClinicName(e.target.value)}
-              placeholder="Add clinic name…"
+              placeholder={adm.placeholderClinic}
               style={{ flex: 1 }}
             />
             <button type="submit" style={{ padding: '0.4rem 0.75rem', cursor: 'pointer' }}>
-              Add
+              {adm.add}
             </button>
           </form>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 180, overflowY: 'auto', fontSize: '0.9rem' }}>
@@ -316,21 +318,21 @@ export const AdminDashboard: React.FC = () => {
                 {c.name}
               </li>
             ))}
-            {clinics.length === 0 && <li style={{ color: '#94a3b8' }}>No clinics yet.</li>}
+            {clinics.length === 0 && <li style={{ color: '#94a3b8' }}>{adm.noClinicsYet}</li>}
           </ul>
         </div>
         <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
-          <h3 style={{ marginTop: 0 }}>Sites / locations</h3>
+          <h3 style={{ marginTop: 0 }}>{adm.sites}</h3>
           <form onSubmit={handleAddSite} style={{ display: 'flex', gap: 8, marginBottom: '0.75rem' }}>
             <input
               type="text"
               value={newSiteName}
               onChange={(e) => setNewSiteName(e.target.value)}
-              placeholder="Add site name…"
+              placeholder={adm.placeholderSite}
               style={{ flex: 1 }}
             />
             <button type="submit" style={{ padding: '0.4rem 0.75rem', cursor: 'pointer' }}>
-              Add
+              {adm.add}
             </button>
           </form>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 180, overflowY: 'auto', fontSize: '0.9rem' }}>
@@ -339,27 +341,27 @@ export const AdminDashboard: React.FC = () => {
                 {s.name}
               </li>
             ))}
-            {sites.length === 0 && <li style={{ color: '#94a3b8' }}>No sites yet.</li>}
+            {sites.length === 0 && <li style={{ color: '#94a3b8' }}>{adm.noSitesYet}</li>}
           </ul>
         </div>
         <div style={{ background: 'white', padding: '1rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
-          <h3 style={{ marginTop: 0 }}>Time delay options</h3>
+          <h3 style={{ marginTop: 0 }}>{adm.timeDelayOptions}</h3>
           <form onSubmit={handleAddTimeDelay} style={{ display: 'grid', gap: 8, marginBottom: '0.75rem' }}>
             <input
               type="text"
               value={newDelayLabel}
               onChange={(e) => setNewDelayLabel(e.target.value)}
-              placeholder='Label (e.g. "1 year")'
+              placeholder={adm.delayLabelPh}
             />
             <input
               type="number"
               min={1}
               value={newDelayHours}
               onChange={(e) => setNewDelayHours(e.target.value)}
-              placeholder="Hours (e.g. 8760)"
+              placeholder={adm.hoursPh}
             />
             <button type="submit" style={{ padding: '0.4rem 0.75rem', cursor: 'pointer', justifySelf: 'start' }}>
-              Add
+              {adm.add}
             </button>
           </form>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 260, overflowY: 'auto', fontSize: '0.9rem' }}>
@@ -390,32 +392,32 @@ export const AdminDashboard: React.FC = () => {
                         }
                       />
                       <button type="button" onClick={() => void handleSaveTimeDelay(opt.id)}>
-                        Save
+                        {co.save}
                       </button>
                     </div>
                   </div>
                 </li>
               );
             })}
-            {timeDelayOptions.length === 0 && <li style={{ color: '#94a3b8' }}>No options yet.</li>}
+            {timeDelayOptions.length === 0 && <li style={{ color: '#94a3b8' }}>{adm.noOptionsYet}</li>}
           </ul>
         </div>
       </div>
 
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: 8, boxShadow: '0 1px 3px rgba(15,23,42,0.1)' }}>
-        <h3 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Users</h3>
+        <h3 style={{ marginTop: 0, marginBottom: '0.75rem' }}>{adm.users}</h3>
         {loadingUsers ? (
-          <p>Loading users…</p>
+          <p>{adm.loadingUsers}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Name</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Email</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Role</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Active</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>Subspecialties (radiologists)</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{adm.colName}</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{adm.colEmail}</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{adm.colRole}</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{adm.colActive}</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>{adm.colSubspecialties}</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,7 +426,7 @@ export const AdminDashboard: React.FC = () => {
                     <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{u.name}</td>
                     <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{u.email}</td>
                     <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9', textTransform: 'capitalize' }}>{u.role}</td>
-                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{u.active ? 'Yes' : 'No'}</td>
+                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>{u.active ? co.yes : co.no}</td>
                     <td style={{ padding: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                       {u.role !== 'radiologist' ? (
                         <span style={{ color: '#94a3b8' }}>N/A</span>
