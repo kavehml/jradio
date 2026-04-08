@@ -17,11 +17,8 @@ function navForRole(
         { to: '/clerical', labelKey: 'clericalIntake' },
         { to: '/requisitions', labelKey: 'requisitions' },
         { to: '/assigning', labelKey: 'workloadSeparation' },
-        { to: '/radiologist/requisitions', labelKey: 'radRequisitions' },
-        { to: '/radiologist/weekly', labelKey: 'radWeekly' },
-        { to: '/radiologist/calendar', labelKey: 'radCalendar' },
+        { to: '/radiologist/calendar', labelKey: 'radScheduleHub' },
         { to: '/service-rules', labelKey: 'serviceRules' },
-        { to: '/admin/radiologist-schedule', labelKey: 'radSchedule' },
         { to: '/admin/rvu-credits', labelKey: 'rvuCredits' },
         { to: '/admin', labelKey: 'userAccess' },
       ],
@@ -92,6 +89,12 @@ export const AppLayout: React.FC = () => {
   const path = location.pathname;
   const isActive = (item: NavItem) => {
     if (item.to === '/admin') return path === '/admin';
+    if (item.labelKey === 'radScheduleHub') {
+      return (
+        path.startsWith('/radiologist') ||
+        path.startsWith('/admin/radiologist-schedule')
+      );
+    }
     if (path === item.to) return true;
     return path.startsWith(`${item.to}/`);
   };
